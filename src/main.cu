@@ -9,18 +9,10 @@
 #include "renderer.h"
 #include "scene/camera.h"
 #include "scene/material.h"
+#include "scene/light.h"
 
 __global__ void kernel()
 {
-    float2 sample = make_float2(3.766134e-01f, 3.841706e-09f);
-    DiffuseMaterial mat(make_float3(0.5f, 0.5f, 0.5f));
-
-    float3 wo = make_float3(0.555849f, -0.763161f, -0.329569f);
-    float3 n = make_float3(0.0f, 0.0f, 1.0f);
-
-    auto p = mat.Sample(-wo, n, sample);
-    printf("p.wi = %e %e %e\n", p.wi.x, p.wi.y, p.wi.z);
-    printf("p.pdf = %e\n", p.pdf);
 }
 
 int main()

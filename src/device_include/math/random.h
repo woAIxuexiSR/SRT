@@ -20,6 +20,16 @@ public:
     {
         return 1 - curand_uniform(&state);
     }
+
+    __device__ float2 random_float2()
+    {
+        return make_float2(random_float(), random_float());
+    }
+
+    __device__ float3 random_float3()
+    {
+        return make_float3(random_float(), random_float(), random_float());
+    }
 };
 
 // host code

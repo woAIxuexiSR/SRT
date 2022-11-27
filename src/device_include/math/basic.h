@@ -106,38 +106,3 @@ __host__ __device__ inline float2 UniformSampleTriangle(float2 sample)
     float sx = sqrt(sample.x);
     return make_float2(1.0f - sx, sample.y * sx);
 }
-
-__host__ __device__ inline float FrDielectric(float cosTheta_i, float eta)
-{
-    if (cosTheta_i < 0)
-    {
-        cosTheta_i = -cosTheta_i;
-        eta = 1 / eta;
-    }
-    float sin2Theta_i = 1 - cosTheta_i * cosTheta_i;
-    float sin2Theta_t = sin2Theta_i / (eta * eta);
-    if (sin2Theta_t >= 1)
-        return 1.0f;
-    float cosTheta_t = sqrt(1 - sin2Theta_t);
-
-    float r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
-    float r_perp = (cosTheta_i - eta * cosTheta_t) / (cosTheta_i + eta * cosTheta_t);
-    return (r_parl * r_parl + r_perp * r_perp) / 2.0f;
-}
-
-__host__ __device__ inline float FrSchlickDielectric(float cosTheta_i, float eta)
-{
-    if (cosTheta_i < 0)
-    {
-        cosTheta_i = -cosTheta_i;
-        eta = 1 / eta;
-    }
-    float sin2Theta_i = 1 - cosTheta_i * cosTheta_i;
-    float sin2Theta_t = sin2Theta_i / (eta * eta);
-    if (sin2Theta_t >= 1)
-        return 1.0f;
-
-    float R0 = (eta - 1) / (eta + 1);
-    R0 = R0 * R0;
-    return R0 + (1 - R0) * pow(1 - cosTheta_i, 5.0f);
-}

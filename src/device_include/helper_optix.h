@@ -33,7 +33,7 @@ struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) SBTRecord
 
 struct RaygenData
 {
-    float3 background;
+
 };
 struct MissData
 {
@@ -41,17 +41,15 @@ struct MissData
 };
 struct HitgroupData
 {
-    DiffuseMaterial mat;
     float3* vertex;
     uint3* index;
     float3* normal;
     float2* texcoord;
 
+    Material mat;
+    float3 albedo;
     bool hasTexture;
     cudaTextureObject_t texture;
-
-    bool isLight;
-    float3 emittance;
 };
 
 typedef SBTRecord<RaygenData> RaygenSBTRecord;

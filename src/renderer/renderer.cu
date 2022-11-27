@@ -14,7 +14,7 @@ Renderer::Renderer(const std::string& objPath, int _w, int _h, bool _u)
     else
     {
         std::filesystem::path curpath(__FILE__);
-        outPath = curpath.parent_path().parent_path().parent_path() / "data" / "out.jpg";
+        outPath = curpath.parent_path().parent_path().parent_path() / "data" / "out.exr";
     }
 }
 
@@ -32,8 +32,8 @@ void Renderer::render()
     else
     {
         rayTracer->render(camera, film);
-        film->fToUchar();
-        film->save_jpg(outPath.string());
-        // film->save_exr(outPath.string());
+        // film->fToUchar();
+        // film->save_jpg(outPath.string());
+        film->save_exr(outPath.string());
     }
 }

@@ -7,5 +7,3 @@
 #include "math/random.h"
 #include "math/ray.h"
 #include "math/transform.h"
-
-#define HHH 0.3

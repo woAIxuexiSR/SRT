@@ -1,15 +1,22 @@
 #pragma once
 
 #include "scene/camera.h"
+#include "scene/light.h"
 
 template <class T>
 struct LaunchParams
 {
+    int SPP;
+    int MAX_DEPTH;
+    float3 background;
+
     int frameId;
     int width, height;
     OptixTraversableHandle traversable;
 
     Camera camera;
+    Light light;
+
     float4* colorBuffer;
     T extraData;
 

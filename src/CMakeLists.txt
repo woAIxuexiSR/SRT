@@ -49,3 +49,4 @@ add_executable(main main.cu)
 target_link_libraries(main PUBLIC renderer)
 
 add_executable(metric metric.cu)
+target_link_libraries(metric PUBLIC definition)

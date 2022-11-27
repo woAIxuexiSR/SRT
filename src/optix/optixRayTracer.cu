@@ -322,7 +322,6 @@ void OptixRayTracer::buildSBT()
     {
         RaygenSBTRecord raygenRec;
         OPTIX_CHECK(optixSbtRecordPackHeader(modulePGs[i].raygenPG, &raygenRec));
-        raygenRec.data.background = make_float3(0.0f, 0.0f, 0.0f);
         raygenRecordsBuffer[i].resize_and_copy_from_host(&raygenRec, 1);
         sbts[i].raygenRecord = (CUdeviceptr)raygenRecordsBuffer[i].data();
 
@@ -351,14 +350,8 @@ void OptixRayTracer::buildSBT()
                 rec.data.index = (uint3*)indexBuffer[k].data();
                 rec.data.normal = (float3*)normalBuffer[k].data();
                 rec.data.texcoord = (float2*)texcoordBuffer[k].data();
-                rec.data.mat = model->diffuseMaterials[model->meshes[k]->materialId];
-                if (length(model->meshes[k]->emittance) > 1e-5)
-                {
-                    rec.data.isLight = true;
-                    rec.data.emittance = model->meshes[k]->emittance;
-                }
-                else
-                    rec.data.isLight = false;
+                rec.data.mat = model->meshes[k]->mat;
+                rec.data.albedo = model->meshes[k]->albedo;
                 if (model->meshes[k]->textureId >= 0)
                 {
                     rec.data.hasTexture = true;
@@ -375,6 +368,44 @@ void OptixRayTracer::buildSBT()
         sbts[i].hitgroupRecordStrideInBytes = sizeof(HitgroupSBTRecord);
         sbts[i].hitgroupRecordCount = (unsigned)hitgroupRecs.size();
     }
+}
+
+void OptixRayTracer::generateLight()
+{
+    std::vector<float3> lightVertices;
+    std::vector<uint3> lightIndices;
+    for(int i = 0; i < model->meshes.size(); i++)
+    {
+        TriangleMesh* mesh = model->meshes[i];
+        if(!mesh->mat.isLight())
+            continue;
+        int vertexOffset = (int)lightVertices.size();
+        lightVertices.insert(lightVertices.end(), mesh->vertices.begin(), mesh->vertices.end());
+        for(int j = 0; j < mesh->indices.size(); j++)
+        {
+            uint3 index = mesh->indices[j];
+            lightIndices.push_back(index + vertexOffset);
+        }
+    }
+    int numTriangles = (int)lightIndices.size();
+    std::vector<float> lightArea(numTriangles);
+    float totalArea = 0.0f;
+    for(int i = 0; i < numTriangles; i++)
+    {
+        float3 v0 = lightVertices[lightIndices[i].x];
+        float3 v1 = lightVertices[lightIndices[i].y];
+        float3 v2 = lightVertices[lightIndices[i].z];
+        float3 e0 = v1 - v0;
+        float3 e1 = v2 - v0;
+        float3 normal = cross(e0, e1);
+        lightArea[i] = length(normal) * 0.5f;
+        totalArea += lightArea[i];
+    }
+
+    lightVertexBuffer.resize_and_copy_from_host(lightVertices);
+    lightIndexBuffer.resize_and_copy_from_host(lightIndices);
+    lightAreaBuffer.resize_and_copy_from_host(lightArea);
+    light.Set(numTriangles, lightVertexBuffer.data(), lightIndexBuffer.data(), lightAreaBuffer.data(), totalArea);
 }
 
 OptixRayTracer::OptixRayTracer(const std::vector<std::string>& _ptxfiles, const Model* _model, int _w, int _h) : model(_model), width(_w), height(_h)
@@ -404,6 +435,9 @@ OptixRayTracer::OptixRayTracer(const std::vector<std::string>& _ptxfiles, const 
 
     std::cout << "building SBT ..." << std::endl;
     buildSBT();
+
+    std::cout << "generating light ..." << std::endl;
+    generateLight();
 
     std::cout << "Optix 7 Renderer fully set up!" << std::endl;
 }

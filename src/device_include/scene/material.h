@@ -3,114 +3,74 @@
 #include <cuda_runtime.h>
 #include "srt_math.h"
 
-// wi: incoming direction  => from light to surface (sample)
+// wi: incoming direction  => from surface to light (sample)
 // wo: outgoing direction  => from surface to camera
 
 enum class MaterialType
 {
-    Diffuse = 1,
-    Specular = 2,
-    Glossy = 4,
-    Transmission = 8,
-    ALL = Diffuse | Specular | Glossy | Transmission
+    Lambertian,
+    Emissive,
+    Disney,
 };
 
 class MaterialSample
 {
 public:
     MaterialType type;  // material type
-    float3 f;           // BRDF
+    float f;           // BRDF
     float3 wi;          // incoming direction
     float pdf;          // pdf of wi
 
     __device__ MaterialSample() {}
-    __device__ MaterialSample(MaterialType _t, float3 _f, float3 _wi, float _pdf)
+    __device__ MaterialSample(MaterialType _t, float _f, float3 _wi, float _pdf)
         : type(_t), f(_f), wi(_wi), pdf(_pdf) {}
 };
 
-class DiffuseMaterial
+class Material
 {
 private:
-    float3 m_color;
+    MaterialType type;
 
 public:
-    __host__ __device__ DiffuseMaterial(float3 color = make_float3(1.0f)) : m_color(color) {}
+    __host__ __device__ Material() : type(MaterialType::Lambertian) {}
+    __host__ __device__ Material(MaterialType _t) : type(_t) {}
 
-    __host__ __device__ float3 getColor() const { return m_color; }
+    __host__ __device__ void setType(MaterialType _t) { type = _t; }
 
-    // return brdf * cosTheta
-    __device__ float3 Eval(float3 wi, float3 wo, float3 n) const
+    __host__ __device__ bool isLight() const { return type == MaterialType::Emissive; }
+
+    __host__ __device__ bool isSpecular() const { return false; }
+
+    __device__ float Eval(float3 wi, float3 wo, float3 n) const
     {
-        if (dot(wi, n) <= 0.0f || dot(wo, n) <= 0.0f)
-            return make_float3(0.0f);
-        return m_color * M_1_PI * dot(wi, n);
+        if (type == MaterialType::Lambertian)
+        {
+            if (dot(wi, n) <= 0.0f || dot(wo, n) <= 0.0f)
+                return 0.0f;
+            return M_1_PI * dot(wi, n);
+        }
+        return 0.0f;
     }
 
     __device__ MaterialSample Sample(float3 wo, float3 n, float2 sample) const
     {
-        float3 v = CosineSampleHemiSphere(sample);
-        Onb onb(n);
-        float3 wi = onb(v);
-        return MaterialSample(MaterialType::Diffuse, Eval(wi, wo, n), wi, Pdf(wi, wo, n));
+        if (type == MaterialType::Lambertian)
+        {
+            float3 v = CosineSampleHemiSphere(sample);
+            Onb onb(n);
+            float3 wi = onb(v);
+            return MaterialSample(type, Eval(wi, wo, n), wi, Pdf(wi, wo, n));
+        }
+        return MaterialSample();
     }
 
     __device__ float Pdf(float3 wi, float3 wo, float3 n) const
     {
-        float cosTheta = dot(wi, n);
-        return CosineHemiSpherePdf(cosTheta);
+        if (type == MaterialType::Lambertian)
+        {
+            float cosTheta = dot(wi, n);
+            return CosineHemiSpherePdf(cosTheta);
+        }
+        return 0.0f;
     }
 };
-
-// class GlossyMaterial
-// {
-// private:
-//     float3 m_color;
-//     float m_roughness;
-// };
-
-// class SpecularMaterial
-// {
-// };
-
-// class RefractiveMaterial
-// {
-// };
-
-
-// class DisneyMaterial
-// {
-// };
-
-
-// class DielectricBxDF : public BxDF
-// {
-// private:
-//     float eta;
-//     float3 m_color;
-
-// public:
-//     DielectricBxDF() {}
-//     DielectricBxDF(float _e, float3 _c) : eta(_e), m_color(_c) {}
-
-//     __device__ float3 Eval(float3 wi, float3 wo) const override
-//     {
-//         return make_float3(0.0f);
-//     }
-
-//     __device__ BxDFSample Sample(float3 wo, float2 sample) const override
-//     {
-//         float Fr = FrDielectric(wo.z, eta);
-//         if(sample.x <= Fr)
-//         {
-//             float3 wi = make_float3(-wo.x, -wo.y, wo.z);
-//             return BxDFSample(BxDFType::Specular, m_color, wi, Fr);
-//         }
-//         else
-//         {
-//             float sin2Theta_t = (1.0 - wo.z * wo.z) / (eta * eta);
-//             float cosTheta_t = sqrt(max(0.0f, 1.0f - sin2Theta_t));
-//             float3 wi = -wo / eta + (wo.z / eta - cosTheta_t) * make_float3(0.0f, 0.0f, 1.0f);
-//             return BxDFSample(BxDFType::Transmission, m_color, wi, 1.0f - Fr);
-//         }
-//     }
-// };

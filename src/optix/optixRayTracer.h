@@ -13,6 +13,7 @@
 #include "scene/camera.h"
 #include "launchParams/LaunchParams.h"
 #include "scene/material.h"
+#include "scene/light.h"
 
 class ModuleProgramGroup
 {
@@ -38,6 +39,11 @@ protected:
     std::vector<GPUMemory<float2> > texcoordBuffer;
     std::vector<GPUMemory<float3> > normalBuffer;
 
+    Light light;
+    GPUMemory<float3> lightVertexBuffer;
+    GPUMemory<uint3> lightIndexBuffer;
+    GPUMemory<float> lightAreaBuffer;
+
     std::vector<cudaArray_t> textureArrays;
     std::vector<cudaTextureObject_t> textureObjects;
 
@@ -60,6 +66,8 @@ protected:
     void buildAccel();
     void createTextures();
     void buildSBT();
+
+    void generateLight();
 
 public:
     OptixRayTracer(const std::vector<std::string>& _ptxfiles, const Model* _model, int _w, int _h);
