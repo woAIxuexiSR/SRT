@@ -13,7 +13,6 @@ struct HitInfo
     float3 hitPos;
     Material mat;
     float3 hitNormal;
-    float3 albedo;
 };
 
 template<typename T>
@@ -49,21 +48,26 @@ extern "C" __global__ void __closesthit__radiance()
     else
     {
         norm = cross(B - A, C - A);
+        if (dot(norm, rayDir) > 0.0f)
+            norm = -norm;
     }
-    if (dot(norm, rayDir) > 0.0f)
-        norm = -norm;
+    // mantain the original normal direction
     prd.hitNormal = normalize(norm);
 
     if (sbtData.hasTexture && sbtData.texcoord)
     {
         float2 tc = sbtData.texcoord[index.x] * (1 - u - v) + sbtData.texcoord[index.y] * u + sbtData.texcoord[index.z] * v;
         float4 tex = tex2D<float4>(sbtData.texture, tc.x, tc.y);
-        prd.albedo = make_float3(tex);
+        float3 albedo = make_float3(pow(tex.x, 2.2f), pow(tex.y, 2.2f), pow(tex.z, 2.2f));
+        prd.mat.setColor(albedo);
     }
-    else prd.albedo = sbtData.albedo;
 }
 
-extern "C" __global__ void __closesthit__shadow() {}
+extern "C" __global__ void __closesthit__shadow()
+{
+    int& prd = *(int*)getPRD<int>();
+    prd = 0;
+}
 
 extern "C" __global__ void __anyhit__radiance() {}
 
@@ -75,7 +79,11 @@ extern "C" __global__ void __miss__radiance()
     prd.isHit = false;
 }
 
-extern "C" __global__ void __miss__shadow() {}
+extern "C" __global__ void __miss__shadow() 
+{
+    int& prd = *(int*)getPRD<int>();
+    prd = 1;
+}
 
 extern "C" __global__ void __raygen__()
 {
@@ -93,65 +101,63 @@ extern "C" __global__ void __raygen__()
         float yy = (iy + rng.random_float()) / launchParams.height;
         Ray ray = camera.getRay(xx, yy);
 
-        HitInfo rayInfo, lightRayInfo;
+        HitInfo rayInfo;
+        int lightRayInfo;
         thrust::pair<unsigned, unsigned> rInfoP = packPointer(&rayInfo), lInfoP = packPointer(&lightRayInfo);
         float3 L = make_float3(0.0f), beta = make_float3(1.0f);
         bool specularBounce = false;
         for (int depth = 0; depth < launchParams.MAX_DEPTH; depth++)
         {
-            optixTrace(
-                launchParams.traversable,
-                ray.pos,
-                ray.dir,
-                1e-3f,
-                1e16f,
-                0.0f,
-                OptixVisibilityMask(255),
-                OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-                RADIANCE_RAY_TYPE,
-                RAY_TYPE_COUNT,
-                RADIANCE_RAY_TYPE,
+            optixTrace(launchParams.traversable, ray.pos, ray.dir, 1e-3f, 1e16f, 0.0f,
+                OptixVisibilityMask(255), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+                RADIANCE_RAY_TYPE, RAY_TYPE_COUNT, RADIANCE_RAY_TYPE,
                 rInfoP.first, rInfoP.second
             );
 
             if (depth == 0 || specularBounce)
             {
                 if (rayInfo.isHit && rayInfo.mat.isLight())
-                    L += beta * rayInfo.albedo;
-                else if(!rayInfo.isHit) 
+                    L += beta * rayInfo.mat.Emission();
+                else if (!rayInfo.isHit)
                     L += beta * launchParams.background;
             }
 
             if (!rayInfo.isHit || rayInfo.mat.isLight()) break;
+            
+            // only glass material may use opposite normal
+            if(!rayInfo.mat.isGlass() && dot(rayInfo.hitNormal, ray.dir) > 0.0f)
+                rayInfo.hitNormal = -rayInfo.hitNormal;
 
-            // sample light
-            float3 ls = light.Sample(rng.random_float2());
-            Ray lightRay = Ray(rayInfo.hitPos, normalize(ls - rayInfo.hitPos));
-            optixTrace(
-                launchParams.traversable,
-                lightRay.pos,
-                lightRay.dir,
-                1e-3f,
-                1e16f,
-                0.0f,
-                OptixVisibilityMask(255),
-                OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-                RADIANCE_RAY_TYPE,
-                RAY_TYPE_COUNT,
-                RADIANCE_RAY_TYPE,
-                lInfoP.first, lInfoP.second
-            );
-            if(lightRayInfo.isHit && length(lightRayInfo.hitPos - ls) < 1e-3f)
+            if(!rayInfo.mat.isSpecular())
             {
-                float cosine = dot(lightRayInfo.hitNormal, -lightRay.dir);
-                float pw = light.Pdf() * dot(ls - rayInfo.hitPos, ls - rayInfo.hitPos) / cosine;
-                L += beta * rayInfo.mat.Eval(lightRay.dir, -ray.dir, rayInfo.hitNormal) * rayInfo.albedo * lightRayInfo.albedo / pw;
-            }
+                // sample light
+                LightSample ls = light.Sample(rng.random_float2());
+                Ray lightRay(rayInfo.hitPos, normalize(ls.pos - rayInfo.hitPos));
+                float dist = length(ls.pos - rayInfo.hitPos);
 
+                optixTrace(launchParams.traversable, lightRay.pos, lightRay.dir, 1e-3f, dist - 1e-3f, 0.0f,
+                    OptixVisibilityMask(255), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+                    SHADOW_RAY_TYPE, RAY_TYPE_COUNT, SHADOW_RAY_TYPE,
+                    lInfoP.first, lInfoP.second
+                );
+                
+                if(lightRayInfo)
+                {
+                    float cosine = abs(dot(ls.normal, lightRay.dir));
+                    float pw = light.Pdf() * dist * dist / cosine;
+                    L += beta * rayInfo.mat.Eval(lightRay.dir, -ray.dir, rayInfo.hitNormal) * dot(lightRay.dir, rayInfo.hitNormal) * ls.emission / pw;
+                }
+            }
+            
             // sample material
             MaterialSample ms = rayInfo.mat.Sample(-ray.dir, rayInfo.hitNormal, rng.random_float2());
-            if(ms.pdf <= 1e-5f) break;
-            beta *= ms.f * rayInfo.albedo / ms.pdf;
+            
+            // change glass normal direction after sampling
+            if(rayInfo.mat.isGlass() && dot(rayInfo.hitNormal, ray.dir) > 0.0f)
+                rayInfo.hitNormal = -rayInfo.hitNormal;
+
+            if (ms.pdf <= 1e-5f) break;
+            beta *= ms.f * dot(ms.wi, rayInfo.hitNormal) / ms.pdf;
             specularBounce = rayInfo.mat.isSpecular();
             ray = Ray(rayInfo.hitPos, ms.wi);
 

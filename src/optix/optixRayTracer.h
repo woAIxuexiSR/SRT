@@ -41,8 +41,10 @@ protected:
 
     Light light;
     GPUMemory<float3> lightVertexBuffer;
+    GPUMemory<float3> lightNormalBuffer;
     GPUMemory<uint3> lightIndexBuffer;
-    GPUMemory<float> lightAreaBuffer;
+    GPUMemory<float> lightAccumAreaBuffer;
+    GPUMemory<float3> lightEmissionBuffer;
 
     std::vector<cudaArray_t> textureArrays;
     std::vector<cudaTextureObject_t> textureObjects;

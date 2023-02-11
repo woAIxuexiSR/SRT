@@ -1,5 +1,7 @@
 set(SHADERS 
-    "pathTracer.cu"
+    "pathTracer/pathTracer.cu"
+    "pathTracer/pathTracer_NEE.cu"
+    "bdpt/bdpt.cu"
     )
 set(SHADERS_HEADERS "")
 
@@ -15,4 +17,4 @@ NVCUDA_COMPILE_MODULE(
 
 add_executable(func func.cu ${PROGRAM_MODULES})
 
-# add_library(func_lib STATIC hello.cu)
+# add_library(func_lib STATIC bdpt.cu)

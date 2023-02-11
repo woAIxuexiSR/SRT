@@ -21,7 +21,6 @@ public:
     std::vector<float2> texcoords;
 
     Material mat;
-    float3 albedo {0.0f, 0.0f, 0.0f};
     int textureId { -1 };
 };
 

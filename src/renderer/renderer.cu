@@ -8,6 +8,7 @@ Renderer::Renderer(const std::string& objPath, int _w, int _h, bool _u)
     camera = std::make_shared<Camera>(make_float3(0.0f, 1.0f, 0.5f), 5.0f, (float)width / (float)height);
 
     rayTracer = std::make_shared<PathTracer>(model.get(), width, height);
+    // rayTracer = std::make_shared<BDPT>(model.get(), width, height);
 
     if (useGui)
         gui = std::make_shared<Gui>(width, height, camera);

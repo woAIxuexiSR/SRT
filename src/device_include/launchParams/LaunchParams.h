@@ -2,6 +2,7 @@
 
 #include "scene/camera.h"
 #include "scene/light.h"
+#include "bdptParams.h"
 
 template <class T>
 struct LaunchParams

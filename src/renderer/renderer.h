@@ -12,6 +12,7 @@
 #include "scene/camera.h"
 #include "optixRayTracer.h"
 #include "pathTracer.h"
+#include "bdpt.h"
 
 class Renderer
 {

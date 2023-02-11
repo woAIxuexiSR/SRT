@@ -106,3 +106,53 @@ __host__ __device__ inline float2 UniformSampleTriangle(float2 sample)
     float sx = sqrt(sample.x);
     return make_float2(1.0f - sx, sample.y * sx);
 }
+
+
+// disney material helper funcitons
+__host__ __device__ inline float Fresnel(float cosThetaI, float cosThetaT, float eta)
+{
+    float rParl = ((eta * cosThetaI) - cosThetaT) / ((eta * cosThetaI) + cosThetaT);
+    float rPerp = ((cosThetaI) - (eta * cosThetaT)) / ((cosThetaI) + (eta * cosThetaT));
+    return (rParl * rParl + rPerp * rPerp) * 0.5f;
+}
+
+__host__ __device__ inline float SchlickFresnel(float u)
+{
+    float m = clamp(1.0f - u, 0.0f, 1.0f);
+    float m2 = m * m;
+    return m2 * m2 * m;
+}
+
+__host__ __device__ inline float GTR1(float NdotH, float a)
+{
+    if (a >= 1.0f) return (1.0f / M_PI);
+    float a2 = a * a;
+    float t = 1.0f + (a2 - 1.0f) * NdotH * NdotH;
+    return (a2 - 1.0f) / (M_PI * log(a2) * t);
+}
+
+__host__ __device__ inline float GTR2(float NdotH, float a)
+{
+    float a2 = a * a;
+    float t = 1.0f + (a2 - 1.0f) * NdotH * NdotH;
+    return a2 / (M_PI * t * t);
+}
+
+__host__ __device__ inline float GTR2_aniso(float NdotH, float HdotX, float HdotY, float ax, float ay)
+{
+    float t = (HdotX * HdotX) / (ax * ax) + (HdotY * HdotY) / (ay * ay) + NdotH * NdotH;
+    return 1.0f / (M_PI * ax * ay * t * t);
+}
+
+__host__ __device__ inline float smithG_GGX(float NdotV, float alphaG)
+{
+    float a = alphaG * alphaG;
+    float b = NdotV * NdotV;
+    return 1.0f / (NdotV + sqrt(a + b - a * b));
+}
+
+__host__ __device__ inline float smithG_GGX_aniso(float NdotV, float VdotX, float VdotY, float ax, float ay)
+{
+    float t = (VdotX * VdotX) / (ax * ax) + (VdotY * VdotY) / (ay * ay) + NdotV * NdotV;
+    return 1.0f / (NdotV + sqrt(t));
+}

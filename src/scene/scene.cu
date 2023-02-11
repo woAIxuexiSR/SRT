@@ -83,13 +83,33 @@ void Model::loadObj(const std::string& objPath)
                                        addVertex(mesh, attributes, idx2, knownVertices));
                 mesh->indices.push_back(idx);
             }
-            mesh->albedo = (const float3&)materials[materialID].diffuse;
             mesh->textureId = loadTexture(knownTextures, materials[materialID].diffuse_texname, modelDir);
             float3 emission = (const float3&)materials[materialID].emission;
+            float3 diffuse = (const float3&)materials[materialID].diffuse;
+            float3 specular = (const float3&)materials[materialID].specular;
+            float3 transmittance = (const float3&)materials[materialID].transmittance;
             if (length(emission) > 0.0f)
             {
-                mesh->albedo = emission;
                 mesh->mat.setType(MaterialType::Emissive);
+                mesh->mat.setColor(emission);
+            }
+            else if (length(transmittance) > 0.0f || materials[materialID].illum == 6 || materials[materialID].illum == 7)
+            {
+                mesh->mat.setType(MaterialType::Glass);
+                // mesh->mat.setColor(transmittance);
+                mesh->mat.setColor(make_float3(1.0f));
+                mesh->mat.ior = materials[materialID].ior;
+            }
+            else
+            {
+                mesh->mat.setType(MaterialType::Disney);
+                if (length(specular) > 0.0f)
+                {
+                    mesh->mat.setColor(specular);
+                    mesh->mat.metallic = 1.0f;
+                    mesh->mat.roughness = 0.0f;
+                }
+                else mesh->mat.setColor(diffuse);
             }
 
             if (mesh->vertices.empty()) delete mesh;

@@ -47,7 +47,6 @@ struct HitgroupData
     float2* texcoord;
 
     Material mat;
-    float3 albedo;
     bool hasTexture;
     cudaTextureObject_t texture;
 };

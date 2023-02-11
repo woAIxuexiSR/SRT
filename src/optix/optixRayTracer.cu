@@ -351,7 +351,6 @@ void OptixRayTracer::buildSBT()
                 rec.data.normal = (float3*)normalBuffer[k].data();
                 rec.data.texcoord = (float2*)texcoordBuffer[k].data();
                 rec.data.mat = model->meshes[k]->mat;
-                rec.data.albedo = model->meshes[k]->albedo;
                 if (model->meshes[k]->textureId >= 0)
                 {
                     rec.data.hasTexture = true;
@@ -373,7 +372,9 @@ void OptixRayTracer::buildSBT()
 void OptixRayTracer::generateLight()
 {
     std::vector<float3> lightVertices;
+    std::vector<float3> lightNormals;
     std::vector<uint3> lightIndices;
+    std::vector<float3> lightEmissions;
     for(int i = 0; i < model->meshes.size(); i++)
     {
         TriangleMesh* mesh = model->meshes[i];
@@ -381,14 +382,23 @@ void OptixRayTracer::generateLight()
             continue;
         int vertexOffset = (int)lightVertices.size();
         lightVertices.insert(lightVertices.end(), mesh->vertices.begin(), mesh->vertices.end());
+        if(mesh->normals.size() > 0)
+            lightNormals.insert(lightNormals.end(), mesh->normals.begin(), mesh->normals.end());
+        else
+        {
+            for(int j = 0; j < mesh->vertices.size(); j++)
+                lightNormals.push_back(make_float3(0.0f));
+        }
+
         for(int j = 0; j < mesh->indices.size(); j++)
         {
             uint3 index = mesh->indices[j];
             lightIndices.push_back(index + vertexOffset);
+            lightEmissions.push_back(mesh->mat.Emission());
         }
     }
     int numTriangles = (int)lightIndices.size();
-    std::vector<float> lightArea(numTriangles);
+    std::vector<float> lightAccumArea(numTriangles);
     float totalArea = 0.0f;
     for(int i = 0; i < numTriangles; i++)
     {
@@ -398,14 +408,17 @@ void OptixRayTracer::generateLight()
         float3 e0 = v1 - v0;
         float3 e1 = v2 - v0;
         float3 normal = cross(e0, e1);
-        lightArea[i] = length(normal) * 0.5f;
-        totalArea += lightArea[i];
+        totalArea += length(normal) * 0.5f;
+        lightAccumArea[i] = totalArea;
     }
 
     lightVertexBuffer.resize_and_copy_from_host(lightVertices);
+    lightNormalBuffer.resize_and_copy_from_host(lightNormals);
     lightIndexBuffer.resize_and_copy_from_host(lightIndices);
-    lightAreaBuffer.resize_and_copy_from_host(lightArea);
-    light.Set(numTriangles, lightVertexBuffer.data(), lightIndexBuffer.data(), lightAreaBuffer.data(), totalArea);
+    lightAccumAreaBuffer.resize_and_copy_from_host(lightAccumArea);
+    lightEmissionBuffer.resize_and_copy_from_host(lightEmissions);
+    light.Set(numTriangles, lightVertexBuffer.data(), lightNormalBuffer.data(), lightIndexBuffer.data(),
+        lightAccumAreaBuffer.data(), lightEmissionBuffer.data(), totalArea);
 }
 
 OptixRayTracer::OptixRayTracer(const std::vector<std::string>& _ptxfiles, const Model* _model, int _w, int _h) : model(_model), width(_w), height(_h)
