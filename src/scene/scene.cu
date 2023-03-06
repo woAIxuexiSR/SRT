@@ -79,38 +79,42 @@ void Model::loadObj(const std::string& objPath)
                 tinyobj::index_t idx2 = shape.mesh.indices[3 * faceID + 2];
 
                 uint3 idx = make_uint3(addVertex(mesh, attributes, idx0, knownVertices),
-                                       addVertex(mesh, attributes, idx1, knownVertices),
-                                       addVertex(mesh, attributes, idx2, knownVertices));
+                    addVertex(mesh, attributes, idx1, knownVertices),
+                    addVertex(mesh, attributes, idx2, knownVertices));
                 mesh->indices.push_back(idx);
             }
             mesh->textureId = loadTexture(knownTextures, materials[materialID].diffuse_texname, modelDir);
+            mesh->materialId = material_params.size();
+
+            MaterialParameter mat;
             float3 emission = (const float3&)materials[materialID].emission;
             float3 diffuse = (const float3&)materials[materialID].diffuse;
             float3 specular = (const float3&)materials[materialID].specular;
             float3 transmittance = (const float3&)materials[materialID].transmittance;
             if (length(emission) > 0.0f)
             {
-                mesh->mat.setType(MaterialType::Emissive);
-                mesh->mat.setColor(emission);
+                mat.type = MaterialType::Emissive;
+                mat.color = emission;
             }
             else if (length(transmittance) > 0.0f || materials[materialID].illum == 6 || materials[materialID].illum == 7)
             {
-                mesh->mat.setType(MaterialType::Glass);
-                // mesh->mat.setColor(transmittance);
-                mesh->mat.setColor(make_float3(1.0f));
-                mesh->mat.ior = materials[materialID].ior;
+                mat.type = MaterialType::Glass;
+                mat.color = make_float3(1.0f);
+                mat.ior = materials[materialID].ior;
             }
             else
             {
-                mesh->mat.setType(MaterialType::Disney);
+                // mat.type = MaterialType::Disney;
+                mat.type = MaterialType::Lambertian;
                 if (length(specular) > 0.0f)
                 {
-                    mesh->mat.setColor(specular);
-                    mesh->mat.metallic = 1.0f;
-                    mesh->mat.roughness = 0.0f;
+                    mat.color = specular;
+                    mat.metallic = 1.0f;
+                    mat.roughness = 0.0f;
                 }
-                else mesh->mat.setColor(diffuse);
+                else mat.color = diffuse;
             }
+            material_params.push_back(mat);
 
             if (mesh->vertices.empty()) delete mesh;
             else meshes.push_back(mesh);

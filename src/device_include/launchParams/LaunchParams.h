@@ -2,16 +2,20 @@
 
 #include "scene/camera.h"
 #include "scene/light.h"
+#include "scene/material.h"
+
 #include "bdptParams.h"
 
-template <class T>
-struct LaunchParams
-{
-    int SPP;
-    int MAX_DEPTH;
-    float3 background;
+#define MAX_DEPTH 16
 
-    int frameId;
+template <class T>
+class LaunchParams
+{
+public:
+    int samplesPerPixel{ 128 };
+    float3 background{ 0.0f, 0.0f, 0.0f };
+    int frameId{ 0 };
+
     int width, height;
     OptixTraversableHandle traversable;
 
@@ -21,6 +25,17 @@ struct LaunchParams
     float4* colorBuffer;
     T extraData;
 
+public:
     LaunchParams() {}
-    LaunchParams(int _w, int _h, OptixTraversableHandle _t) : frameId(0), width(_w), height(_h), traversable(_t) {}
+};
+
+
+struct HitInfo
+{
+    bool isHit;
+
+    float3 hitPos;
+    float3 hitNormal;
+    const Material* mat;
+    float3 color;
 };

@@ -311,6 +311,48 @@ void OptixRayTracer::createTextures()
     }
 }
 
+__global__ void create_materials_kernel(int num, MaterialParameter* mps, Material** mat)
+{
+    for(int i = 0; i < num; i++)
+    {
+        if(mps[i].type == MaterialType::Emissive)
+            mat[i] = new EmissionMaterial(mps[i].color);
+        else if(mps[i].type == MaterialType::Glass)
+            mat[i] = new GlassMaterial(mps[i].color, mps[i].ior);
+        else if(mps[i].type == MaterialType::Lambertian)
+            mat[i] = new LambertianMaterial(mps[i].color);
+        else if(mps[i].type == MaterialType::Disney)
+        {
+            DisneyMaterial* dptr = new DisneyMaterial(mps[i].color);
+            dptr->metallic = mps[i].metallic;
+            dptr->roughness = mps[i].roughness;
+            mat[i] = dptr;
+
+            float3 color = mat[i]->getColor();
+            printf("%f, %f, %f\n", color.x, color.y, color.z);
+        }
+        else
+        {
+            printf("Error! Unknown material type!\n");
+        }
+    }
+}
+
+void OptixRayTracer::createMaterials()
+{
+    int numMaterials = (int)model->material_params.size();
+
+    GPUMemory<MaterialParameter> materialParametersBuffer;
+    materialParametersBuffer.resize_and_copy_from_host(model->material_params);
+
+    materialBuffer.resize(numMaterials);
+    create_materials_kernel<<<1, 1>>>(numMaterials, materialParametersBuffer.data(), materialBuffer.data());
+    checkCudaErrors(cudaDeviceSynchronize());
+
+    material_ptr.resize(numMaterials);
+    materialBuffer.copy_to_host(material_ptr);
+}
+
 void OptixRayTracer::buildSBT()
 {
     sbts.resize(modulePGs.size());
@@ -350,7 +392,7 @@ void OptixRayTracer::buildSBT()
                 rec.data.index = (uint3*)indexBuffer[k].data();
                 rec.data.normal = (float3*)normalBuffer[k].data();
                 rec.data.texcoord = (float2*)texcoordBuffer[k].data();
-                rec.data.mat = model->meshes[k]->mat;
+                rec.data.mat = material_ptr[model->meshes[k]->materialId];
                 if (model->meshes[k]->textureId >= 0)
                 {
                     rec.data.hasTexture = true;
@@ -375,32 +417,32 @@ void OptixRayTracer::generateLight()
     std::vector<float3> lightNormals;
     std::vector<uint3> lightIndices;
     std::vector<float3> lightEmissions;
-    for(int i = 0; i < model->meshes.size(); i++)
+    for (int i = 0; i < model->meshes.size(); i++)
     {
         TriangleMesh* mesh = model->meshes[i];
-        if(!mesh->mat.isLight())
+        if (model->material_params[mesh->materialId].type != MaterialType::Emissive)
             continue;
         int vertexOffset = (int)lightVertices.size();
         lightVertices.insert(lightVertices.end(), mesh->vertices.begin(), mesh->vertices.end());
-        if(mesh->normals.size() > 0)
+        if (mesh->normals.size() > 0)
             lightNormals.insert(lightNormals.end(), mesh->normals.begin(), mesh->normals.end());
         else
         {
-            for(int j = 0; j < mesh->vertices.size(); j++)
+            for (int j = 0; j < mesh->vertices.size(); j++)
                 lightNormals.push_back(make_float3(0.0f));
         }
 
-        for(int j = 0; j < mesh->indices.size(); j++)
+        for (int j = 0; j < mesh->indices.size(); j++)
         {
             uint3 index = mesh->indices[j];
             lightIndices.push_back(index + vertexOffset);
-            lightEmissions.push_back(mesh->mat.Emission());
+            lightEmissions.push_back(model->material_params[mesh->materialId].color);
         }
     }
     int numTriangles = (int)lightIndices.size();
     std::vector<float> lightAccumArea(numTriangles);
     float totalArea = 0.0f;
-    for(int i = 0; i < numTriangles; i++)
+    for (int i = 0; i < numTriangles; i++)
     {
         float3 v0 = lightVertices[lightIndices[i].x];
         float3 v1 = lightVertices[lightIndices[i].y];
@@ -421,10 +463,10 @@ void OptixRayTracer::generateLight()
         lightAccumAreaBuffer.data(), lightEmissionBuffer.data(), totalArea);
 }
 
-OptixRayTracer::OptixRayTracer(const std::vector<std::string>& _ptxfiles, const Model* _model, int _w, int _h) : model(_model), width(_w), height(_h)
+OptixRayTracer::OptixRayTracer(const std::vector<std::string>& _ptxfiles, const Model* _model): model(_model)
 {
     std::filesystem::path ptxFolder("ptx");
-    for(const auto& ptxfile : _ptxfiles)
+    for (const auto& ptxfile : _ptxfiles)
     {
         std::filesystem::path ptxPath = ptxFolder / ptxfile;
         std::string shader = getPtxFromFile(ptxPath.string());
@@ -446,6 +488,9 @@ OptixRayTracer::OptixRayTracer(const std::vector<std::string>& _ptxfiles, const 
     std::cout << "creating textures ..." << std::endl;
     createTextures();
 
+    std::cout << "createing materials ..." << std::endl;
+    createMaterials();
+
     std::cout << "building SBT ..." << std::endl;
     buildSBT();
 
@@ -453,4 +498,16 @@ OptixRayTracer::OptixRayTracer(const std::vector<std::string>& _ptxfiles, const 
     generateLight();
 
     std::cout << "Optix 7 Renderer fully set up!" << std::endl;
+}
+
+__global__ void delete_materials_kernel(int num, Material** materials)
+{
+    for(int i = 0; i < num; i++)
+        delete materials[i];
+}
+
+OptixRayTracer::~OptixRayTracer()
+{
+    delete_materials_kernel<<<1, 1>>>(material_ptr.size(), materialBuffer.data());
+    checkCudaErrors(cudaDeviceSynchronize());
 }

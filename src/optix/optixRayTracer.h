@@ -48,6 +48,8 @@ protected:
 
     std::vector<cudaArray_t> textureArrays;
     std::vector<cudaTextureObject_t> textureObjects;
+    GPUMemory<Material*> materialBuffer;
+    std::vector<Material*> material_ptr;
 
     std::vector<OptixShaderBindingTable> sbts;
     std::vector<GPUMemory<RaygenSBTRecord> > raygenRecordsBuffer;
@@ -57,7 +59,6 @@ protected:
     OptixTraversableHandle traversable;
     GPUMemory<unsigned char> asBuffer;      // preserve
 
-    int width, height;
 
     void initOptix();
 
@@ -67,12 +68,14 @@ protected:
 
     void buildAccel();
     void createTextures();
+    void createMaterials();
     void buildSBT();
 
     void generateLight();
 
 public:
-    OptixRayTracer(const std::vector<std::string>& _ptxfiles, const Model* _model, int _w, int _h);
+    OptixRayTracer(const std::vector<std::string>& _ptxfiles, const Model* _model);
+    ~OptixRayTracer();
 
     virtual void render(std::shared_ptr<Camera> camera, std::shared_ptr<Film> film) = 0;
 };

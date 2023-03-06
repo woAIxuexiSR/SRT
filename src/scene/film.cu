@@ -26,6 +26,17 @@ void Film::fToUchar()
     checkCudaErrors(cudaDeviceSynchronize());
 }
 
+void Film::save_png(const std::string& filename) const
+{
+    std::vector<uchar4> pixels_cpu(width * height);
+    pixels_u.copy_to_host(pixels_cpu);
+
+    stbi_flip_vertically_on_write(true);
+    int ret = stbi_write_png(filename.c_str(), width, height, 4, (void*)pixels_cpu.data(), 0);
+    if (ret == 0)
+        std::cout << "Failed to save image: " << filename << std::endl;
+}
+
 void Film::save_jpg(const std::string& filename) const
 {
     std::vector<uchar4> pixels_cpu(width * height);
@@ -95,4 +106,9 @@ void Film::save_exr(const std::string& filename) const
     free(header.channels);
     free(header.pixel_types);
     free(header.requested_pixel_types);
+}
+
+void Film::memset_0()
+{
+    pixels_f.memset(0);
 }

@@ -16,19 +16,26 @@ public:
         curand_init(seed, seq, 0, &state);
     }
 
-    __device__ float random_float() 
+    // [0, 1)
+    __device__ inline float random_float() 
     {
         return 1 - curand_uniform(&state);
     }
 
-    __device__ float2 random_float2()
+    __device__ inline float2 random_float2()
     {
         return make_float2(random_float(), random_float());
     }
 
-    __device__ float3 random_float3()
+    __device__ inline float3 random_float3()
     {
         return make_float3(random_float(), random_float(), random_float());
+    }
+
+    // [min, max)
+    __device__ inline int random_int(int min, int max)
+    {
+        return min + curand(&state) % (max - min);
     }
 };
 

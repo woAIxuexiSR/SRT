@@ -4,6 +4,7 @@
 #include <vector>
 #include "helper_optix.h"
 #include "optixRayTracer.h"
+#include "integrator.h"
 #include "definition.h"
 #include "film.h"
 #include "renderer.h"
@@ -11,62 +12,94 @@
 #include "scene/material.h"
 #include "scene/light.h"
 
-__global__ void kernel()
+void test_render()
 {
+    const int width = 1920, height = 1080;
+    float aspect = (float)width / (float)height;
+
+    std::filesystem::path currentPath(__FILE__);
+
+    std::filesystem::path modelPath;
+    modelPath = currentPath.parent_path().parent_path() / "data" / "CornellBox" / "CornellBox-Original.obj";
+    // modelPath = currentPath.parent_path().parent_path() / "data" / "CornellBox" / "CornellBox-Glossy.obj";
+    // modelPath = currentPath.parent_path().parent_path() / "data" / "CornellBox" / "CornellBox-Mirror.obj";
+    // modelPath = currentPath.parent_path().parent_path() / "data" / "CornellBox" / "CornellBox-Water.obj";
+    // modelPath = currentPath.parent_path().parent_path() / "data" / "SimpleSphere" / "sphere.obj";
+    // modelPath = currentPath.parent_path().parent_path() / "data" / "sponza" / "sponza.obj";
+
+    std::filesystem::path outPath;
+    outPath = currentPath.parent_path().parent_path() / "data" / "out.exr";
+
+
+    auto film = std::make_shared<Film>(width, height);
+    auto model = std::make_shared<Model>(modelPath.string());
+    auto camera = std::make_shared<Camera>(make_float3(0.0f, 1.0f, 0.5f), 5.0f, aspect);
+
+    auto rayTracer = std::make_shared<PathTracer>(model.get());
+    // auto rayTracer = std::make_shared<LightTracer>(model.get());
+    // auto rayTracer = std::make_shared<BDPT>(model.get());
+    // auto rayTracer = std::make_shared<DirectLight>(model.get());
+    // rayTracer->setSamplesPerPixel(65536 * 4);
+    // rayTracer->setSamplesPerPixel(4096);
+
+    ImageRender imageRender(film, model, camera, rayTracer, outPath.string());
+    TICK(time);
+    imageRender.render();
+    TOCK(time);
+
+    // auto gui = std::make_shared<Gui>(width, height, camera);
+    // InteractiveRender interactiveRender(film, model, camera, rayTracer, gui);
+    // interactiveRender.render();
+
+    // outPath = outPath.parent_path() / "test.mp4";
+    // VideoRender videoRender(film, model, camera, rayTracer, outPath.string());
+    // TICK(time);
+    // videoRender.render();
+    // TOCK(time);
 }
 
-float3 test(float3 wo, float3 n, float2 sample)
+__global__ void kernel(int num, Material** mat)
 {
-    float eta = 1.0f / 1.5f, cosi = dot(wo, n);
-    if (cosi <= 0.0f)
+    for(int i = 0; i < num; i++)
     {
-        eta = 1.0f / eta;
-        cosi = -cosi;
-        n = -n;
+        mat[i] = new LambertianMaterial(make_float3(0.5f, 0.5f, 0.5f));
     }
+}
 
-    float sint = eta * sqrt(max(0.0f, 1.0f - cosi * cosi));
-    float cost = sqrt(max(0.0f, 1.0f - sint * sint));
-    float reflectRatio = sint >= 1.0f ? 1.0f : Fresnel(cosi, cost, eta);
-    std::cout << sint << " " << cost << std::endl;
+__global__ void kernel2(Material* mat)
+{
+    float3 color = mat->getColor();
+    printf("%f %f %f\n", color.x, color.y, color.z);
+    MaterialType type = mat->getType();
+    printf("%d\n", type);
+    MaterialSample ms = mat->Sample(make_float3(1.0f, 1.0f, 0.0f), make_float3(0.0f, 1.0f, 0.0f), make_float2(0.3f, 0.6f),
+        make_float3(0.2f, 0.4f, 0.5f), false);
+    printf("%f %f %f %f\n", ms.f.x, ms.f.y, ms.f.z, ms.pdf);
+}
 
-    float3 rperp = -eta * (wo - n * cosi);
-    float3 rparl = -sqrt(max(0.0f, 1.0f - dot(rperp, rperp))) * n;
-    return normalize(rperp + rparl);
-
-    // float3 wi;
-    // if (sample.x <= reflectRatio)
-    //     wi = 2.0f * cosi * n - wo;
-    // else
-    // {
-    //     float3 rperp = -eta * (wo - n * cosi);
-    //     float3 rparl = -sqrt(max(0.0f, 1.0f - dot(rperp, rperp))) * n;
-    //     wi = normalize(rperp + rparl);
-    // }
-
-    // return wi;
+__global__ void kernel3(Material* mat)
+{
+    delete mat;
 }
 
 int main()
 {
-    std::filesystem::path filename(__FILE__);
-    // filename = filename.parent_path().parent_path() / "data" / "CornellBox" / "CornellBox-Original.obj";
-    filename = filename.parent_path().parent_path() / "data" / "CornellBox" / "CornellBox-Glossy.obj";
-    // filename = filename.parent_path().parent_path() / "data" / "CornellBox" / "CornellBox-Mirror.obj";
-    // filename = filename.parent_path().parent_path() / "data" / "CornellBox" / "CornellBox-Water.obj";
-    // filename = filename.parent_path().parent_path() / "data" / "SimpleSphere" / "sphere.obj";
-    // filename = filename.parent_path().parent_path() / "data" / "sponza" / "sponza.obj";
-    Renderer renderer(filename, 800, 600, false);
-    renderer.render();
+    test_render();
 
-    // kernel<<<1, 1>>>();
+    // GPUMemory<Material*> mat;
+    // mat.resize(1);
+    // kernel<<<1, 1>>>(1, mat.data());
     // checkCudaErrors(cudaDeviceSynchronize());
 
-    // float3 wo = normalize(make_float3(-1.f, 2.f, 0.0f));
-    // float3 n = normalize(make_float3(0.0f, 1.0f, 0.0f));
-    // float2 sample = make_float2(0.5f, 0.5f);
-    // float3 wi = test(wo, n, sample);
-    // std::cout << wi.x << " " << wi.y << " " << wi.z << std::endl;
+    // std::vector<Material*> mat_host;
+    // mat_host.resize(1);
+    // mat.copy_to_host(mat_host);
+
+    // kernel2<<<1, 1>>>(mat_host[0]);
+    // checkCudaErrors(cudaDeviceSynchronize());
+    
+    // kernel3<<<1, 1>>>(mat_host[0]);
+    // checkCudaErrors(cudaDeviceSynchronize());
 
     return 0;
 }

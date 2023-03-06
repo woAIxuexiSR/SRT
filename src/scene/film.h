@@ -24,9 +24,17 @@ public:
 
     uchar4* getuPtr() { return pixels_u.data(); }
 
+    int getWidth() const { return width; }
+    
+    int getHeight() const { return height; }
+
     void fToUchar();
+
+    void save_png(const std::string& filename) const;
 
     void save_jpg(const std::string& filename) const;
 
     void save_exr(const std::string& filename) const;
+
+    void memset_0();
 };

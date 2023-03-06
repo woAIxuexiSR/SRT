@@ -1,40 +1,71 @@
 #include "renderer.h"
 
-Renderer::Renderer(const std::string& objPath, int _w, int _h, bool _u)
-    : width(_w), height(_h), useGui(_u)
+void ImageRender::render()
 {
-    film = std::make_shared<Film>(width, height);
-    model = std::make_shared<Model>(objPath);
-    camera = std::make_shared<Camera>(make_float3(0.0f, 1.0f, 0.5f), 5.0f, (float)width / (float)height);
+    rayTracer->render(camera, film);
 
-    rayTracer = std::make_shared<PathTracer>(model.get(), width, height);
-    // rayTracer = std::make_shared<BDPT>(model.get(), width, height);
-
-    if (useGui)
-        gui = std::make_shared<Gui>(width, height, camera);
-    else
+    if(type == "EXR")
+        film->save_exr(imagePath);
+    else if(type == "JPG")
     {
-        std::filesystem::path curpath(__FILE__);
-        outPath = curpath.parent_path().parent_path().parent_path() / "data" / "out.exr";
+        film->fToUchar();
+        film->save_jpg(imagePath);
+    }
+    else if(type == "PNG")
+    {
+        film->fToUchar();
+        film->save_png(imagePath);
+    }
+    else
+        std::cout << "Image type not supported" << std::endl;
+}
+
+void InteractiveRender::render()
+{
+    while(!gui->shouldClose())
+    {
+        rayTracer->render(camera, film);
+        film->fToUchar();
+        gui->run((unsigned char*)film->getuPtr());
     }
 }
 
-void Renderer::render()
+void VideoRender::render()
 {
-    if (useGui)
+    std::string command = "mkdir temporaryImages";
+    int result = std::system(command.c_str());
+    if(result != 0)
     {
-        while (!gui->shouldClose())
-        {
-            rayTracer->render(camera, film);
-            film->fToUchar();
-            gui->run((unsigned char*)film->getuPtr());
-        }
+        std::cout << "Error: Failed to create temporaryImages directory." << std::endl;
+        exit(-1);
     }
-    else
+
+    for(int i = 0; i < 60; i++)
     {
         rayTracer->render(camera, film);
-        // film->fToUchar();
-        // film->save_jpg(outPath.string());
-        film->save_exr(outPath.string());
+        film->fToUchar();
+        film->save_png("temporaryImages/" + std::to_string(i) + ".png");
+    }
+
+    int width = film->getWidth(), height = film->getHeight();
+    command = "ffmpeg -y -framerate " + std::to_string(fps);
+    command += " -i temporaryImages/%d.png ";
+    command += "-c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p ";
+    command += videoPath;
+    std::cout << command << std::endl;
+
+    result = std::system(command.c_str());
+    if(result != 0)
+    {
+        std::cout << "Error: Failed to create video." << std::endl;
+        exit(-1);
+    }
+
+    command = "rm -r temporaryImages";
+    result = std::system(command.c_str());
+    if(result != 0)
+    {
+        std::cout << "Error: Failed to delete temporaryImages directory." << std::endl;
+        exit(-1);
     }
 }

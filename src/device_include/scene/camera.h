@@ -24,6 +24,20 @@ public:
         return Ray(pos, normalize(lower_left_corner + horizontal * x + vertical * y));
     }
 
+    // dir must be normalized
+    __host__ __device__ thrust::pair<float, float> getXY(float3 dir)
+    {
+        float3 forward = lower_left_corner + horizontal * 0.5f + vertical * 0.5f;
+        float cost = dot(forward, dir);
+        if(cost < 0.0f)
+            return thrust::make_pair(-1.0f, -1.0f);
+        float3 f = forward * cost / dot(forward, forward);
+        float3 v = (dir - f) * cost / dot(f, dir);
+        float x = dot(v, horizontal) / dot(horizontal, horizontal) + 0.5f;
+        float y = dot(v, vertical) / dot(vertical, vertical) + 0.5f;
+        return thrust::make_pair(x, y);
+    }
+
     // host function
     Camera() : Camera(make_float3(0.0f, 0.0f, 1.0f), 1.0f, 1.0f) {}
 

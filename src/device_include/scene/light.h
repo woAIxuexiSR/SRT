@@ -9,9 +9,10 @@ public:
     float3 pos;
     float3 normal;
     float3 emission;
+    float pdf;
 
     __device__ __host__ LightSample() {}
-    __device__ __host__ LightSample(float3 _p, float3 _n, float3 _e) : pos(_p), normal(_n), emission(_e) {}
+    __device__ __host__ LightSample(float3 _p, float3 _n, float3 _e, float _pdf) : pos(_p), normal(_n), emission(_e), pdf(_pdf) {}
 };
 
 class Light
@@ -52,13 +53,13 @@ public:
                 float3 normal = normals[index.x] * (1.0f - p.x - p.y) + normals[index.y] * p.x + normals[index.z] * p.y;
                 if(length(normals[index.x]) < 0.1f)
                     normal = cross(vertices[index.y] - vertices[index.x], vertices[index.z] - vertices[index.x]);
-                return LightSample(pos, normalize(normal), emission[i]);
+                return LightSample(pos, normalize(normal), emission[i], Pdf());
             }
         }
         return LightSample();
     }
 
-    __device__ float Pdf()
+    __device__ inline float Pdf()
     {
         return 1.0f / totalArea;
     }
