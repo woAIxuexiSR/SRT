@@ -2,8 +2,8 @@
 
 
 PathTracer::PathTracer(const Model* _model)
-    // : OptixRayTracer({ "pathTracer.ptx" }, _model)
-    : OptixRayTracer({ "pathTracer_.ptx" }, _model)
+    : OptixRayTracer({ "pathTracer.ptx" }, _model)
+    // : OptixRayTracer({ "pathTracer_.ptx" }, _model)
 {
     launchParams.traversable = traversable;
     launchParams.light = light;

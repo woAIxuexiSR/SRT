@@ -30,8 +30,8 @@ extern "C" __global__ void __closesthit__radiance()
     HitInfo& prd = *(HitInfo*)getPRD<HitInfo>();
     prd.isHit = true;
     prd.hitPos = A * (1 - u - v) + B * u + C * v;
-    prd.mat = sbtData.mat;
-    prd.color = sbtData.mat->getColor();
+    prd.mat = &sbtData.mat;
+    prd.color = sbtData.mat.getColor();
 
     float3 norm;
     if (sbtData.normal)
@@ -109,9 +109,7 @@ extern "C" __global__ void __raygen__()
                 rayInfo.hitNormal = -rayInfo.hitNormal;
 
             // sample material
-            // printf("%f %f %f, %f %f %f, %f %f %f\n", ray.dir.x, ray.dir.y, ray.dir.z, rayInfo.hitNormal.x, rayInfo.hitNormal.y, rayInfo.hitNormal.z, rayInfo.color.x, rayInfo.color.y, rayInfo.color.z);
-            MaterialSample ms = rayInfo.mat->Sample(-ray.dir, rayInfo.hitNormal, rng.random_float2(), rayInfo.color, false);
-            // printf("%f %f %f %f\n", ms.f.x, ms.f.y, ms.f.z, ms.pdf);
+            MaterialSample ms = rayInfo.mat->Sample(-ray.dir, rayInfo.hitNormal, rng.random_float2(), rayInfo.color);
 
             // change glass normal direction after sampling
             if(rayInfo.mat->isGlass() && dot(rayInfo.hitNormal, ray.dir) > 0.0f)

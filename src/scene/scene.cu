@@ -84,37 +84,34 @@ void Model::loadObj(const std::string& objPath)
                 mesh->indices.push_back(idx);
             }
             mesh->textureId = loadTexture(knownTextures, materials[materialID].diffuse_texname, modelDir);
-            mesh->materialId = material_params.size();
 
-            MaterialParameter mat;
             float3 emission = (const float3&)materials[materialID].emission;
             float3 diffuse = (const float3&)materials[materialID].diffuse;
             float3 specular = (const float3&)materials[materialID].specular;
             float3 transmittance = (const float3&)materials[materialID].transmittance;
             if (length(emission) > 0.0f)
             {
-                mat.type = MaterialType::Emissive;
-                mat.color = emission;
+                mesh->mat.type = MaterialType::Emissive;
+                mesh->mat.color = emission;
             }
             else if (length(transmittance) > 0.0f || materials[materialID].illum == 6 || materials[materialID].illum == 7)
             {
-                mat.type = MaterialType::Glass;
-                mat.color = make_float3(1.0f);
-                mat.ior = materials[materialID].ior;
+                mesh->mat.type = MaterialType::Glass;
+                mesh->mat.color = make_float3(1.0f);
+                mesh->mat.params[0] = materials[materialID].ior;
             }
             else
             {
-                // mat.type = MaterialType::Disney;
-                mat.type = MaterialType::Lambertian;
+                // mesh->mat.type = MaterialType::Disney;
+                mesh->mat.type = MaterialType::Lambertian;
                 if (length(specular) > 0.0f)
                 {
-                    mat.color = specular;
-                    mat.metallic = 1.0f;
-                    mat.roughness = 0.0f;
+                    mesh->mat.color = specular;
+                    mesh->mat.params[0] = 1.0f;
+                    mesh->mat.params[2] = 0.0f;
                 }
-                else mat.color = diffuse;
+                else mesh->mat.color = diffuse;
             }
-            material_params.push_back(mat);
 
             if (mesh->vertices.empty()) delete mesh;
             else meshes.push_back(mesh);

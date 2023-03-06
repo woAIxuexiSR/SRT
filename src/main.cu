@@ -12,6 +12,11 @@
 #include "scene/material.h"
 #include "scene/light.h"
 
+__host__ __device__ float3 func()
+{
+    return {0.1f, 0.2f, 0.3f};
+}
+
 void test_render()
 {
     const int width = 1920, height = 1080;
@@ -58,47 +63,17 @@ void test_render()
     // TOCK(time);
 }
 
-__global__ void kernel(int num, Material** mat)
+__global__ void kernel()
 {
-    for(int i = 0; i < num; i++)
-    {
-        mat[i] = new LambertianMaterial(make_float3(0.5f, 0.5f, 0.5f));
-    }
-}
-
-__global__ void kernel2(Material* mat)
-{
-    float3 color = mat->getColor();
-    printf("%f %f %f\n", color.x, color.y, color.z);
-    MaterialType type = mat->getType();
-    printf("%d\n", type);
-    MaterialSample ms = mat->Sample(make_float3(1.0f, 1.0f, 0.0f), make_float3(0.0f, 1.0f, 0.0f), make_float2(0.3f, 0.6f),
-        make_float3(0.2f, 0.4f, 0.5f), false);
-    printf("%f %f %f %f\n", ms.f.x, ms.f.y, ms.f.z, ms.pdf);
-}
-
-__global__ void kernel3(Material* mat)
-{
-    delete mat;
+    auto t = func();
+    printf("%f %f %f\n", t.x, t.y, t.z);
 }
 
 int main()
 {
     test_render();
 
-    // GPUMemory<Material*> mat;
-    // mat.resize(1);
-    // kernel<<<1, 1>>>(1, mat.data());
-    // checkCudaErrors(cudaDeviceSynchronize());
-
-    // std::vector<Material*> mat_host;
-    // mat_host.resize(1);
-    // mat.copy_to_host(mat_host);
-
-    // kernel2<<<1, 1>>>(mat_host[0]);
-    // checkCudaErrors(cudaDeviceSynchronize());
-    
-    // kernel3<<<1, 1>>>(mat_host[0]);
+    // kernel<<<1, 1>>>();
     // checkCudaErrors(cudaDeviceSynchronize());
 
     return 0;
