@@ -4,7 +4,7 @@
 #include <cuda_runtime.h>
 #include <optix.h>
 #include <optix_stubs.h>
-#include "srt_math.h"
+#include "my_math.h"
 #include "scene/material.h"
 
 inline void help_optix(OptixResult res, const char* func, const char* file, const int line)
@@ -46,8 +46,9 @@ struct HitgroupData
     float3* normal;
     float2* texcoord;
 
+    int mesh_id;
     Material mat;
-    bool hasTexture;
+    bool has_texture;
     cudaTextureObject_t texture;
 };
 

@@ -4,15 +4,6 @@
 #include <thrust/optional.h>
 
 template <int N>
-class hhh
-{
-public:
-    int a[N][N];
-    int t;
-    __host__ __device__ hhh(int x) : t(x){}
-};
-
-template <int N>
 __host__ __device__ inline void init(float m[N][N], int i, int j) {}
 
 template <int N, class... Args>
@@ -100,7 +91,7 @@ public:
         SquareMatrix res;
         for (int i = 0; i < N; i++)
             for (int j = 0; j < N; j++)
-                res.m[i][j] += other.m[i][j];
+                res.m[i][j] = m[i][j] + other.m[i][j];
         return res;
     }
 
@@ -109,7 +100,7 @@ public:
         SquareMatrix res;
         for (int i = 0; i < N; i++)
             for (int j = 0; j < N; j++)
-                res.m[i][j] -= other.m[i][j];
+                res.m[i][j] = m[i][j] - other.m[i][j];
         return res;
     }
 
@@ -128,7 +119,7 @@ public:
         SquareMatrix res;
         for (int i = 0; i < N; i++)
             for (int j = 0; j < N; j++)
-                res.m[i][j] *= s;
+                res.m[i][j] = m[i][j] * s;
         return res;
     }
 

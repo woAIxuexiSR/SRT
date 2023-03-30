@@ -17,7 +17,7 @@ public:
     }
 
     // [0, 1)
-    __device__ inline float random_float() 
+    __device__ inline float random_float()
     {
         return 1 - curand_uniform(&state);
     }

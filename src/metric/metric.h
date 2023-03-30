@@ -1,20 +1,19 @@
 #pragma once
 
 #include <cuda_runtime.h>
-#include <string>
-#include <vector>
+#include "definition.h"
 #include "helper_math.h"
 
 class Metric
 {
 private:
     int width, height;
-    std::vector<float4> img, ref;
+    vector<float4> img, ref;
     static constexpr double eps = 1e-6;
 
 public:
 
-    Metric(int _w, int _h, float* _img, float* _ref) : width(_w), height(_h)
+    Metric(int _w, int _h, float* _img, float* _ref): width(_w), height(_h)
     {
         img.resize(width * height);
         ref.resize(width * height);
@@ -25,25 +24,25 @@ public:
         }
     }
 
-    Metric(int _w, int _h, const std::vector<float4>& _img, const std::vector<float4>& _ref)
+    Metric(int _w, int _h, const vector<float4>& _img, const vector<float4>& _ref)
         : width(_w), height(_h), img(_img), ref(_ref)
     { }
 
-    double compute(const std::string& type)
+    double compute(const string& type)
     {
-        if(type == "MSE")
+        if (type == "MSE")
             return compute_MSE();
-        if(type == "RMSE")
+        if (type == "RMSE")
             return compute_RMSE();
-        if(type == "relMSE")
+        if (type == "relMSE")
             return compute_relMSE();
-        if(type == "MAE")
+        if (type == "MAE")
             return compute_MAE();
-        if(type == "MAPE")
+        if (type == "MAPE")
             return compute_MAPE();
-        if(type == "SMAPE")
+        if (type == "SMAPE")
             return compute_SMAPE();
-        if(type == "PSNR")
+        if (type == "PSNR")
             return compute_PSNR();
         return 0.0;
     }

@@ -5,7 +5,7 @@ project(SRT LANGUAGES C CXX CUDA)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_ARCHITECTURES 86)
-set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
+# set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 set(CMAKE_BUILD_TYPE Debug)
 
 set(EXTENSIONS_DIR "${CMAKE_SOURCE_DIR}/extensions")
@@ -32,10 +32,12 @@ find_program(BIN2C bin2c)
 set(CUDA_INCLUDE "${CUDA_TOOLKIT_ROOT_DIR}/include")
 set(CUDA_LIB "${CUDA_LIBRARIES}" "${CUDA_CUDA_LIBRARY}" "cuda" "cublas")
 
+# assimp
+find_package(assimp REQUIRED)
+set(ASSIMP_LIB "assimp::assimp")
+
 # stb_image
 set(STB_INCLUDE "${EXTENSIONS_DIR}/stb_image")
-# tiny obj loader
-set(TINY_OBJ_INCLUDE "${EXTENSIONS_DIR}/tinyobjloader")
 # zlib
 find_package(ZLIB REQUIRED)
 set(ZLIB_LIB "${ZLIB_LIBRARIES}")
@@ -111,11 +113,11 @@ list(APPEND PROJECT_INCLUDE
     ${CUDA_INCLUDE}
     ${STB_INCLUDE}
     ${TINY_OBJ_INCLUDE}
+    ${TINY_PLY_INCLUDE}
     ${TINY_EXR_INCLUDE}
     ${TINY_CUDA_NN_INCLUDE}
     ${OptiX_INCLUDE}
 )
 include_directories(${PROJECT_INCLUDE})
-
 
 add_subdirectory(src)

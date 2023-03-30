@@ -1,91 +1,76 @@
 #pragma once
 
-#include <string>
 #include <filesystem>
-#include <memory>
-#include <chrono>
 
-#include "srt_math.h"
+#include "definition.h"
+#include "my_math.h"
 #include "gui.h"
 #include "film.h"
 #include "scene.h"
+#include "integrator.h"
 #include "scene/camera.h"
-#include "optixRayTracer.h"
 
-class Render
+
+class ImageRender
 {
-protected:
-    std::shared_ptr<Film> film;
-    std::shared_ptr<Model> model;
-    std::shared_ptr<Camera> camera;
-    std::shared_ptr<OptixRayTracer> rayTracer;
+private:
+    string image_path;
+
+    shared_ptr<Film> film;
+    shared_ptr<Camera> camera;
+    shared_ptr<OptixRayTracer> ray_tracer;
 
 public:
-    Render(
-        std::shared_ptr<Film> _film,
-        std::shared_ptr<Model> _model,
-        std::shared_ptr<Camera> _camera,
-        std::shared_ptr<OptixRayTracer> _rayTracer
-    ): film(_film), model(_model), camera(_camera), rayTracer(_rayTracer) {}
+    ImageRender(RenderParams params, shared_ptr<Scene> scene, string _path);
 
-    virtual void render() = 0;
+    void render();
 };
 
 
-class ImageRender: Render
+class InteractiveRender
 {
 private:
-    std::string imagePath;
-    std::string type;
+    shared_ptr<Film> film;
+    shared_ptr<Camera> camera;
+    shared_ptr<OptixRayTracer> ray_tracer;
+    shared_ptr<InteractiveGui> gui;
 
 public:
-    ImageRender(
-        std::shared_ptr<Film> _film,
-        std::shared_ptr<Model> _model,
-        std::shared_ptr<Camera> _camera,
-        std::shared_ptr<OptixRayTracer> _rayTracer,
-        std::string _imagePath,
-        std::string _type = "EXR"
-    ): Render(_film, _model, _camera, _rayTracer), imagePath(_imagePath), type(_type) {}
+    InteractiveRender(RenderParams params, shared_ptr<Scene> scene);
 
-
-    virtual void render() override;
+    void render();
 };
 
 
-class InteractiveRender: Render
+class VideoRender
 {
 private:
-    std::shared_ptr<Gui> gui;
-
-public:
-    InteractiveRender(
-        std::shared_ptr<Film> _film,
-        std::shared_ptr<Model> _model,
-        std::shared_ptr<Camera> _camera,
-        std::shared_ptr<OptixRayTracer> _rayTracer,
-        std::shared_ptr<Gui> _gui
-    ): Render(_film, _model, _camera, _rayTracer), gui(_gui) {}
-
-    virtual void render() override;
-};
-
-
-class VideoRender: Render
-{
-private:
-    std::string videoPath;
+    string video_path;
     int fps;
 
-public:
-    VideoRender(
-        std::shared_ptr<Film> _film,
-        std::shared_ptr<Model> _model,
-        std::shared_ptr<Camera> _camera,
-        std::shared_ptr<OptixRayTracer> _rayTracer,
-        std::string _videoPath,
-        int _fps = 30
-    ): Render(_film, _model, _camera, _rayTracer), videoPath(_videoPath), fps(_fps) {}
+    shared_ptr<Film> film;
+    shared_ptr<Camera> camera;
+    shared_ptr<OptixRayTracer> ray_tracer;
 
-    virtual void render() override;
+public:
+    VideoRender(RenderParams params, shared_ptr<Scene> scene, string _path, int _fps = 30);
+
+    void render();
+};
+
+
+class MaterialAdjustRender
+{
+private:
+    shared_ptr<Film> film;
+    shared_ptr<Camera> camera;
+    shared_ptr<Scene> scene;
+    shared_ptr<Material> mat;
+    shared_ptr<MaterialAdjuster> ray_tracer;
+    shared_ptr<MaterialAdjustGui> gui;
+
+public:
+    MaterialAdjustRender(int _w, int _h);
+
+    void render();
 };

@@ -16,8 +16,8 @@ add_subdirectory(renderer)
 # add_executable(hello hello.cu)
 # target_link_libraries(hello PUBLIC renderer)
 
-add_executable(main main.cu)
+add_executable(main main.cpp)
 target_link_libraries(main PUBLIC renderer)
 
-add_executable(metric metric.cu)
-target_link_libraries(metric PUBLIC definition)
+# add_executable(metric metric.cu)
+# target_link_libraries(metric PUBLIC definition)

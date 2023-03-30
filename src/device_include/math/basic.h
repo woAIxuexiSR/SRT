@@ -4,19 +4,19 @@
 #include <thrust/pair.h>
 #include "helper_math.h"
 
-__host__ __device__ inline float Radians(float deg)
+__host__ __device__ inline float radians(float deg)
 {
     return deg * M_PI / 180.0f;
 }
 
 // pack pointer
-__host__ __device__ inline thrust::pair<unsigned, unsigned> packPointer(void* ptr)
+__host__ __device__ inline thrust::pair<unsigned, unsigned> pack_pointer(void* ptr)
 {
     unsigned long long p = reinterpret_cast<unsigned long long>(ptr);
     return thrust::make_pair(static_cast<unsigned>(p >> 32), static_cast<unsigned>(p & 0xffffffff));
 }
 
-__host__ __device__ inline void* unpackPointer(unsigned i0, unsigned i1)
+__host__ __device__ inline void* unpack_pointer(unsigned i0, unsigned i1)
 {
     unsigned long long p = static_cast<unsigned long long>(i0) << 32 | i1;
     return reinterpret_cast<void*>(p);
@@ -24,7 +24,7 @@ __host__ __device__ inline void* unpackPointer(unsigned i0, unsigned i1)
 
 
 // sample
-__host__ __device__ inline float3 UniformSampleHemiSphere(float2 sample)
+__host__ __device__ inline float3 uniform_sample_hemisphere(float2 sample)
 {
     float z = sample.x;
     float r = sqrt(1.0f - z * z);
@@ -32,12 +32,12 @@ __host__ __device__ inline float3 UniformSampleHemiSphere(float2 sample)
     return make_float3(r * cos(phi), r * sin(phi), z);
 }
 
-__host__ __device__ inline float UniformHemiSpherePdf()
+__host__ __device__ inline float uniform_hemisphere_pdf()
 {
     return 0.5f * M_1_PI;
 }
 
-__host__ __device__ inline float3 UniformSampleSphere(float2 sample)
+__host__ __device__ inline float3 uniform_sample_sphere(float2 sample)
 {
     float z = 1.0f - 2.0f * sample.x;
     float r = sqrt(1.0f - z * z);
@@ -45,63 +45,64 @@ __host__ __device__ inline float3 UniformSampleSphere(float2 sample)
     return make_float3(r * cos(phi), r * sin(phi), z);
 }
 
-__host__ __device__ inline float UniformSpherePdf()
+__host__ __device__ inline float uniform_sphere_pdf()
 {
     return 0.25f * M_1_PI;
 }
 
-__host__ __device__ inline float2 UniformSampleDisk(float2 sample)
+__host__ __device__ inline float2 uniform_sample_disk(float2 sample)
 {
     float r = sqrt(sample.x);
     float theta = 2.0f * M_PI * sample.y;
     return r * make_float2(cos(theta), sin(theta));
 }
 
-__host__ __device__ inline float2 ConcentricSampleDisk(float2 sample)
+__host__ __device__ inline float2 concentric_sample_disk(float2 sample)
 {
-    float2 uOffset = 2.0f * sample - 1.0f;
-    if (uOffset.x == 0 && uOffset.y == 0)
+    float2 offset = 2.0f * sample - 1.0f;
+    if (offset.x == 0 && offset.y == 0)
         return make_float2(0.0f, 0.0f);
     float theta, r;
-    if (fabs(uOffset.x) > fabs(uOffset.y))
+    if (fabs(offset.x) > fabs(offset.y))
     {
-        r = uOffset.x;
-        theta = M_PI_4 * (uOffset.y / uOffset.x);
+        r = offset.x;
+        theta = M_PI_4 * (offset.y / offset.x);
     }
     else
     {
-        r = uOffset.y;
-        theta = M_PI_2 - M_PI_4 * (uOffset.x / uOffset.y);
+        r = offset.y;
+        theta = M_PI_2 - M_PI_4 * (offset.x / offset.y);
     }
     return r * make_float2(cos(theta), sin(theta));
 }
 
-__host__ __device__ inline float UniformDiskPdf()
+__host__ __device__ inline float uniform_disk_pdf()
 {
     return M_1_PI;
 }
 
-__host__ __device__ inline float3 CosineSampleHemiSphere(float2 sample)
+__host__ __device__ inline float3 cosine_sample_hemisphere(float2 sample)
 {
-    float2 d = ConcentricSampleDisk(sample);
+    // float2 d = concentric_sample_disk(sample);
+    float2 d = uniform_sample_disk(sample);
     float z = sqrt(fmax(0.0f, 1.0f - d.x * d.x - d.y * d.y));
     return make_float3(d.x, d.y, z);
 }
 
-__host__ __device__ inline float CosineHemiSpherePdf(float cosTheta)
+__host__ __device__ inline float cosine_hemisphere_pdf(float cos_theta)
 {
-    return cosTheta * M_1_PI;
+    return cos_theta * M_1_PI;
 }
 
-__host__ __device__ inline float3 UniformSampleCone(float2 sample, float cosThetaMax)
+__host__ __device__ inline float3 uniform_sample_cone(float2 sample, float max_cosine)
 {
-    float cosTheta = (1.0f - sample.x) + sample.x * cosThetaMax;
-    float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
+    float cosine = (1.0f - sample.x) + sample.x * max_cosine;
+    float sine = sqrt(1.0f - cosine * cosine);
     float phi = 2.0f * M_PI * sample.y;
-    return make_float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+    return make_float3(cos(phi) * sine, sin(phi) * sine, cosine);
 }
 
-__host__ __device__ inline float2 UniformSampleTriangle(float2 sample)
+__host__ __device__ inline float2 uniform_sample_triangle(float2 sample)
 {
     float sx = sqrt(sample.x);
     return make_float2(1.0f - sx, sample.y * sx);
@@ -109,50 +110,39 @@ __host__ __device__ inline float2 UniformSampleTriangle(float2 sample)
 
 
 // disney material helper funcitons
-__host__ __device__ inline float Fresnel(float cosThetaI, float cosThetaT, float eta)
+__host__ __device__ inline float fresnel(float cos_theta_i, float cos_theta_t, float eta)
 {
-    float rParl = ((eta * cosThetaI) - cosThetaT) / ((eta * cosThetaI) + cosThetaT);
-    float rPerp = ((cosThetaI) - (eta * cosThetaT)) / ((cosThetaI) + (eta * cosThetaT));
-    return (rParl * rParl + rPerp * rPerp) * 0.5f;
+    float r_parl = ((eta * cos_theta_i) - cos_theta_t) / ((eta * cos_theta_i) + cos_theta_t);
+    float r_perp = ((cos_theta_i)-(eta * cos_theta_t)) / ((cos_theta_i)+(eta * cos_theta_t));
+    return (r_parl * r_parl + r_perp * r_perp) * 0.5f;
 }
 
-__host__ __device__ inline float SchlickFresnel(float u)
+__host__ __device__ inline float schlick_fresnel(float cos_theta, float eta = 1.0f)
 {
-    float m = clamp(1.0f - u, 0.0f, 1.0f);
-    float m2 = m * m;
-    return m2 * m2 * m;
+    float r0 = (eta - 1.0f) / (eta + 1.0f);
+    r0 = r0 * r0;
+    float m = clamp(1.0f - cos_theta, 0.0f, 1.0f);
+    return r0 + (1.0f - r0) * m * m * m * m * m;
 }
 
-__host__ __device__ inline float GTR1(float NdotH, float a)
+__host__ __device__ inline float GTR1(float n_h, float a)
 {
-    if (a >= 1.0f) return (1.0f / M_PI);
+    if (a >= 1.0f) return M_1_PI;
     float a2 = a * a;
-    float t = 1.0f + (a2 - 1.0f) * NdotH * NdotH;
+    float t = 1.0f + (a2 - 1.0f) * n_h * n_h;
     return (a2 - 1.0f) / (M_PI * log(a2) * t);
 }
 
-__host__ __device__ inline float GTR2(float NdotH, float a)
+__host__ __device__ inline float GTR2(float n_h, float a)
 {
     float a2 = a * a;
-    float t = 1.0f + (a2 - 1.0f) * NdotH * NdotH;
+    float t = 1.0f + (a2 - 1.0f) * n_h * n_h;
     return a2 / (M_PI * t * t);
 }
 
-__host__ __device__ inline float GTR2_aniso(float NdotH, float HdotX, float HdotY, float ax, float ay)
-{
-    float t = (HdotX * HdotX) / (ax * ax) + (HdotY * HdotY) / (ay * ay) + NdotH * NdotH;
-    return 1.0f / (M_PI * ax * ay * t * t);
-}
-
-__host__ __device__ inline float smithG_GGX(float NdotV, float alphaG)
+__host__ __device__ inline float smithG_GGX(float n_v, float alphaG)
 {
     float a = alphaG * alphaG;
-    float b = NdotV * NdotV;
-    return 1.0f / (NdotV + sqrt(a + b - a * b));
-}
-
-__host__ __device__ inline float smithG_GGX_aniso(float NdotV, float VdotX, float VdotY, float ax, float ay)
-{
-    float t = (VdotX * VdotX) / (ax * ax) + (VdotY * VdotY) / (ay * ay) + NdotV * NdotV;
-    return 1.0f / (NdotV + sqrt(t));
+    float b = n_v * n_v;
+    return (2.0f * n_v) / (n_v + sqrt(a + b - a * b));
 }

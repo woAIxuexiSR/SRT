@@ -9,5 +9,5 @@ public:
     float3 dir;
 
     __host__ __device__ Ray() {}
-    __host__ __device__ Ray(float3 _p, float3 _d) : pos(_p), dir(_d) {}
+    __host__ __device__ Ray(float3 _p, float3 _d): pos(_p), dir(_d) {}
 };

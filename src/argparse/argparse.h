@@ -1,15 +1,13 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <iostream>
+#include "definition.h"
 #include <sstream>
 #include <algorithm>
 #include <functional>
 
 
 template<class T>
-T parse_value(const std::string& value)
+inline T parse_value(const string& value)
 {
     std::stringstream ss(value);
     T result;
@@ -18,7 +16,7 @@ T parse_value(const std::string& value)
 }
 
 template<class T>
-std::string to_str(const T& value)
+inline string to_str(const T& value)
 {
     std::stringstream ss;
     ss << value;
@@ -28,12 +26,12 @@ std::string to_str(const T& value)
 class short_circuit_option
 {
 public:
-    std::string short_name;
-    std::string long_name;
-    std::string help;
+    string short_name;
+    string long_name;
+    string help;
     std::function<void(void)> callback;
 
-    short_circuit_option(const std::string& _sn, const std::string& _ln, const std::string& _h, const std::function<void(void)>& _cb)
+    short_circuit_option(const string& _sn, const string& _ln, const string& _h, const std::function<void(void)>& _cb)
         : short_name(_sn), long_name(_ln), help(_h), callback(_cb)
     { }
 };
@@ -41,13 +39,13 @@ public:
 class option
 {
 public:
-    std::string short_name;
-    std::string long_name;
-    std::string help;
+    string short_name;
+    string long_name;
+    string help;
     std::size_t type;
-    std::string value;
+    string value;
 
-    option(const std::string& _sn, const std::string& _ln, const std::string& _h, std::size_t _hc, const std::string& _v)
+    option(const string& _sn, const string& _ln, const string& _h, std::size_t _hc, const string& _v)
         : short_name(_sn), long_name(_ln), help(_h), type(_hc), value(_v)
     { }
 };
@@ -55,12 +53,12 @@ public:
 class argument
 {
 public:
-    std::string name;
-    std::string help;
+    string name;
+    string help;
     std::size_t type;
-    std::string value;
+    string value;
 
-    argument(const std::string& _n, const std::string& _h, std::size_t _hc)
+    argument(const string& _n, const string& _h, std::size_t _hc)
         : name(_n), help(_h), type(_hc)
     { }
 };
@@ -68,27 +66,27 @@ public:
 class argparser
 {
 private:
-    std::string description;
-    std::string program_name;
-    std::vector<short_circuit_option> sc_options;
-    std::vector<option> options;
-    std::vector<argument> arguments;
+    string description;
+    string program_name;
+    vector<short_circuit_option> sc_options;
+    vector<option> options;
+    vector<argument> arguments;
 
 
 public:
-    argparser(const std::string& _des) : description(_des) {}
+    argparser(const string& _des): description(_des) {}
 
-    argparser& set_program_name(const std::string& _name)
+    argparser& set_program_name(const string& _name)
     {
         program_name = _name;
         return *this;
     }
 
-    argparser& add_sc_option(const std::string& sname, const std::string& lname, const std::string& help, const std::function<void(void)>& callback)
+    argparser& add_sc_option(const string& sname, const string& lname, const string& help, const std::function<void(void)>& callback)
     {
-        if(check_option_exists(sname, lname))
+        if (check_option_exists(sname, lname))
         {
-            std::cout << "Shortcut option " << sname << " or " << lname << " already exists" << std::endl;
+            cout << "Shortcut option " << sname << " or " << lname << " already exists" << endl;
             exit(-1);
         }
         sc_options.emplace_back(short_circuit_option(sname, lname, help, callback));
@@ -97,36 +95,36 @@ public:
 
     argparser& add_help_option()
     {
-        return add_sc_option("-h", "--help", "Show help message", [this](){ print_help(); });
+        return add_sc_option("-h", "--help", "Show help message", [this]() { print_help(); });
     }
 
     template<class T>
-    argparser& add_option(const std::string& sname, const std::string& lname, const std::string& help, T&& value)
+    argparser& add_option(const string& sname, const string& lname, const string& help, T&& value)
     {
-        if(check_option_exists(sname, lname))
+        if (check_option_exists(sname, lname))
         {
-            std::cout << "Option " << sname << " or " << lname << " already exists" << std::endl;
+            cout << "Option " << sname << " or " << lname << " already exists" << endl;
             exit(-1);
         }
         options.emplace_back(option(sname, lname, help, typeid(T).hash_code(), to_str(value)));
         return *this;
     }
 
-    argparser& add_option(const std::string& sname, const std::string& lname, const std::string& help)
+    argparser& add_option(const string& sname, const string& lname, const string& help)
     {
         add_option<bool>(sname, lname, help, false);
         return *this;
     }
 
     template<class T>
-    argparser& add_argument(const std::string& name, const std::string& help)
+    argparser& add_argument(const string& name, const string& help)
     {
         auto it = std::find_if(arguments.begin(), arguments.end(), [&](const argument& a) {
             return a.name == name;
-        });
-        if(it != arguments.end())
+            });
+        if (it != arguments.end())
         {
-            std::cout << "Argument " << name << " already exists" << std::endl;
+            cout << "Argument " << name << " already exists" << endl;
             exit(-1);
         }
         arguments.emplace_back(argument(name, help, typeid(T).hash_code()));
@@ -134,72 +132,72 @@ public:
     }
 
     template<class T>
-    T get(const std::string& name) const
+    T get(const string& name) const
     {
         auto oit = std::find_if(options.begin(), options.end(), [&name](const option& o) {
             return o.short_name.substr(1) == name || o.long_name.substr(2) == name
                 || o.short_name == name || o.long_name == name;
-        });
-        if(oit != options.end())
+            });
+        if (oit != options.end())
             return parse_value<T>(oit->value);
 
         auto ait = std::find_if(arguments.begin(), arguments.end(), [&name](const argument& a) {
             return a.name == name;
-        });
-        if(ait != arguments.end())
+            });
+        if (ait != arguments.end())
             return parse_value<T>(ait->value);
 
-        std::cout << "Error: option or argument " << name << " not found!" << std::endl;
+        cout << "Error: option or argument " << name << " not found!" << endl;
         exit(-1);
     }
 
     argparser& parse(int argc, char* argv[])
     {
-        if(program_name == "")
+        if (program_name == "")
             program_name = argv[0];
 
-        if(argc == 1)
+        if (argc == 1)
         {
             print_usage();
             exit(0);
         }
 
-        std::vector<std::string> tokens;
-        for(int i = 1; i < argc; i++)
+        vector<string> tokens;
+        for (int i = 1; i < argc; i++)
             tokens.emplace_back(argv[i]);
 
         // parse short circuit options
-        for(auto& sc : sc_options)
+        for (auto& sc : sc_options)
         {
-            auto it = std::find_if(tokens.begin(), tokens.end(), [&sc](const std::string& t) {
+            auto it = std::find_if(tokens.begin(), tokens.end(), [&sc](const string& t) {
                 return t == sc.short_name || t == sc.long_name;
-            });
-            if(it == tokens.end())
+                });
+            if (it == tokens.end())
                 continue;
             sc.callback();
             exit(0);
         }
 
         // parse options
-        for(auto &&opt : options)
+        for (auto&& opt : options)
         {
-            auto it = std::find_if(tokens.begin(), tokens.end(), [&](const std::string& s) {
+            auto it = std::find_if(tokens.begin(), tokens.end(), [&](const string& s) {
                 return s == opt.short_name || s == opt.long_name;
-            });
-            
-            if(it == tokens.end())
+                });
+
+            if (it == tokens.end())
                 continue;
 
             it = tokens.erase(it);
-            if(opt.type == typeid(bool).hash_code())
+            if (opt.type == typeid(bool).hash_code())
             {
                 opt.value = "1";
                 continue;
             }
 
-            if(it == tokens.end() || it->front() == '-')
+            if (it == tokens.end() || it->front() == '-')
             {
-                std::cout << "Error parse option : " << opt.short_name << " " << opt.long_name << " should have value" << std::endl;
+                cout << "Error parse option : " << opt.short_name << " " << opt.long_name << " should have value" << endl;
                 exit(-1);
             }
 
@@ -208,12 +206,12 @@ public:
         }
 
         // parse arguments
-        if(tokens.size() != arguments.size())
+        if (tokens.size() != arguments.size())
         {
-            std::cout << "Error parse arguments : " << tokens.size() << " arguments provided, but " << arguments.size() << " expected" << std::endl;
+            cout << "Error parse arguments : " << tokens.size() << " arguments provided, but " << arguments.size() << " expected" << endl;
             exit(-1);
         }
-        for(int i = 0; i < arguments.size(); i++)
+        for (int i = 0; i < arguments.size(); i++)
             arguments[i].value = tokens[i];
 
         return *this;
@@ -221,45 +219,45 @@ public:
 
     void print_usage()
     {
-        std::cout << "Usage: " << program_name << " [options] ";
-        for(auto &&arg : arguments)
-            std::cout << arg.name << " ";
-        std::cout << std::endl;
+        cout << "Usage: " << program_name << " [options] ";
+        for (auto&& arg : arguments)
+            cout << arg.name << " ";
+        cout << endl;
     }
 
     void print_help()
     {
         print_usage();
-        std::cout << std::endl;
-        std::cout << description << std::endl;
-        std::cout << std::endl;
-        std::cout << "Options:" << std::endl;
-        for(auto &&opt : options)
+        cout << endl;
+        cout << description << endl;
+        cout << endl;
+        cout << "Options:" << endl;
+        for (auto&& opt : options)
         {
-            std::cout << "  " << opt.short_name << ", " << opt.long_name << " : " << opt.help << std::endl;
+            cout << "  " << opt.short_name << ", " << opt.long_name << " : " << opt.help << endl;
         }
-        for(auto &&sc : sc_options)
+        for (auto&& sc : sc_options)
         {
-            std::cout << "  " << sc.short_name << ", " << sc.long_name << " : " << sc.help << std::endl;
+            cout << "  " << sc.short_name << ", " << sc.long_name << " : " << sc.help << endl;
         }
-        std::cout << std::endl;
-        std::cout << "Arguments:" << std::endl;
-        for(auto &&arg : arguments)
+        cout << endl;
+        cout << "Arguments:" << endl;
+        for (auto&& arg : arguments)
         {
-            std::cout << "  " << arg.name << " : " << arg.help << std::endl;
+            cout << "  " << arg.name << " : " << arg.help << endl;
         }
     }
 
-    bool check_option_exists(const std::string& sname, const std::string& lname) const
+    bool check_option_exists(const string& sname, const string& lname) const
     {
         auto it = std::find_if(options.begin(), options.end(), [&](const option& o) {
             return o.short_name == sname || o.long_name == lname;
-        });
-        if(it != options.end())
+            });
+        if (it != options.end())
             return true;
         auto sc_it = std::find_if(sc_options.begin(), sc_options.end(), [&](const short_circuit_option& o) {
             return o.short_name == sname || o.long_name == lname;
-        });
+            });
         return sc_it != sc_options.end();
     }
 };

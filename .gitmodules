@@ -1,0 +1,3 @@
+[submodule "extensions/tiny-cuda-nn"]
+	path = extensions/tiny-cuda-nn
+	url = https://github.com/NVlabs/tiny-cuda-nn.git

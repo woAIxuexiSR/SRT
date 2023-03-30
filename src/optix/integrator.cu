@@ -1,180 +1,234 @@
 #include "integrator.h"
 
-
-PathTracer::PathTracer(const Model* _model)
-    : OptixRayTracer({ "pathTracer.ptx" }, _model)
-    // : OptixRayTracer({ "pathTracer_.ptx" }, _model)
+MaterialAdjuster::MaterialAdjuster(const Scene* _scene, shared_ptr<Material> _mat)
+    : OptixRayTracer({ "material_adjuster.ptx" }, _scene), mat(_mat)
 {
-    launchParams.traversable = traversable;
-    launchParams.light = light;
+    params.traversable = traversable;
+    params.light = light;
 }
 
-void PathTracer::render(std::shared_ptr<Camera> camera, std::shared_ptr<Film> film)
+void MaterialAdjuster::render(shared_ptr<Camera> camera, shared_ptr<Film> film)
 {
-    launchParams.width = film->getWidth();
-    launchParams.height = film->getHeight();
-    launchParams.colorBuffer = film->getfPtr();
-    launchParams.camera = *camera;
+    params.spp = spp;
+    params.background = background;
+    params.width = film->get_width();
+    params.height = film->get_height();
+    params.buffer = film->get_fptr();
+    params.camera = *camera;
+    params.extra = *mat;
 
-    GPUMemory<LaunchParams<int> > launchParamsBuffer;
-    launchParamsBuffer.resize_and_copy_from_host(&launchParams, 1);
+    GPUMemory<LaunchParams<Material> > params_buffer;
+    params_buffer.resize_and_copy_from_host(&params, 1);
 
     OPTIX_CHECK(optixLaunch(
         pipelines[0],
         stream,
-        (CUdeviceptr)launchParamsBuffer.data(),
-        launchParamsBuffer.size() * sizeof(LaunchParams<int>),
+        (CUdeviceptr)params_buffer.data(),
+        params_buffer.size() * sizeof(LaunchParams<Material>),
         &sbts[0],
-        launchParams.width,
-        launchParams.height,
+        params.width,
+        params.height,
         1));
     checkCudaErrors(cudaDeviceSynchronize());
 
-    launchParams.frameId++;
+    params.frame++;
 }
 
 
-LightTracer::LightTracer(const Model* _model)
-    : OptixRayTracer({ "lightTracer.ptx" }, _model)
+SimpleShader::SimpleShader(const Scene* _scene, SimpleShadeType _type)
+    : OptixRayTracer({ "simple_shader.ptx" }, _scene)
 {
-    launchParams.traversable = traversable;
-    launchParams.light = light;
+    params.traversable = traversable;
+    params.light = light;
+    params.extra = _type;
 }
 
-__global__ void average_radiance(int n_elements, float4* __restrict__ colorBuffer, int* __restrict__ pixelCnt)
+void SimpleShader::render(shared_ptr<Camera> camera, shared_ptr<Film> film)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if(i >= n_elements) return;
-    if(pixelCnt[i] == 0)
-        colorBuffer[i] = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
-    // else
-    //     colorBuffer[i] /= pixelCnt[i];
-}
+    params.spp = spp;
+    params.background = background;
+    params.width = film->get_width();
+    params.height = film->get_height();
+    params.buffer = film->get_fptr();
+    params.camera = *camera;
 
-void LightTracer::render(std::shared_ptr<Camera> camera, std::shared_ptr<Film> film)
-{
-    film->memset_0();
-    launchParams.width = film->getWidth();
-    launchParams.height = film->getHeight();
-    launchParams.colorBuffer = film->getfPtr();
-    launchParams.camera = *camera;
-
-    int n_elements = launchParams.width * launchParams.height;
-    pixelCnt.resize(n_elements);
-    pixelCnt.memset(0);
-    launchParams.extraData = pixelCnt.data();
-
-    GPUMemory<LaunchParams<int*> > launchParamsBuffer;
-    launchParamsBuffer.resize_and_copy_from_host(&launchParams, 1);
+    GPUMemory<LaunchParams<SimpleShadeType> > params_buffer;
+    params_buffer.resize_and_copy_from_host(&params, 1);
 
     OPTIX_CHECK(optixLaunch(
         pipelines[0],
         stream,
-        (CUdeviceptr)launchParamsBuffer.data(),
-        launchParamsBuffer.size() * sizeof(LaunchParams<int>),
+        (CUdeviceptr)params_buffer.data(),
+        params_buffer.size() * sizeof(LaunchParams<SimpleShadeType>),
         &sbts[0],
-        launchParams.width,
-        launchParams.height,
+        params.width,
+        params.height,
         1));
     checkCudaErrors(cudaDeviceSynchronize());
 
-
-    tcnn::linear_kernel(average_radiance, 0, 0, n_elements, launchParams.colorBuffer, launchParams.extraData);
-    checkCudaErrors(cudaDeviceSynchronize());
-
-    launchParams.frameId++;
+    params.frame++;
 }
 
-
-DirectLight::DirectLight(const Model* _model)
-    : OptixRayTracer({ "directLight.ptx" }, _model)
+PathTracer::PathTracer(const Scene* _scene)
+    : OptixRayTracer({ "path_tracer.ptx" }, _scene)
+    // : OptixRayTracer({ "__path_tracer.ptx" }, _scene)
 {
-    launchParams.traversable = traversable;
-    launchParams.light = light;
+    params.traversable = traversable;
+    params.light = light;
 }
 
-void DirectLight::render(std::shared_ptr<Camera> camera, std::shared_ptr<Film> film)
+void PathTracer::render(shared_ptr<Camera> camera, shared_ptr<Film> film)
 {
-    launchParams.width = film->getWidth();
-    launchParams.height = film->getHeight();
-    launchParams.colorBuffer = film->getfPtr();
-    launchParams.camera = *camera;
+    params.spp = spp;
+    params.background = background;
+    params.width = film->get_width();
+    params.height = film->get_height();
+    params.buffer = film->get_fptr();
+    params.camera = *camera;
 
-    GPUMemory<LaunchParams<int> > launchParamsBuffer;
-    launchParamsBuffer.resize_and_copy_from_host(&launchParams, 1);
+    GPUMemory<LaunchParams<int> > params_buffer;
+    params_buffer.resize_and_copy_from_host(&params, 1);
 
     OPTIX_CHECK(optixLaunch(
         pipelines[0],
         stream,
-        (CUdeviceptr)launchParamsBuffer.data(),
-        launchParamsBuffer.size() * sizeof(LaunchParams<int>),
+        (CUdeviceptr)params_buffer.data(),
+        params_buffer.size() * sizeof(LaunchParams<int>),
         &sbts[0],
-        launchParams.width,
-        launchParams.height,
+        params.width,
+        params.height,
         1));
     checkCudaErrors(cudaDeviceSynchronize());
 
-    launchParams.frameId++;
+    params.frame++;
 }
 
-
-BDPT::BDPT(const Model* _model, int _sqrtNumLightPaths)
-    : OptixRayTracer({ "lightPath.ptx", "cameraPath.ptx" }, _model), sqrtNumLightPaths(_sqrtNumLightPaths)
+LightTracer::LightTracer(const Scene* _scene)
+    : OptixRayTracer({ "light_tracer.ptx" }, _scene)
 {
-    launchParams.traversable = traversable;
-    launchParams.light = light;
-
-    lightPaths.resize(sqrtNumLightPaths * sqrtNumLightPaths);
-    launchParams.extraData = lightPaths.data();
+    params.traversable = traversable;
+    params.light = light;
 }
 
-void BDPT::render(std::shared_ptr<Camera> camera, std::shared_ptr<Film> film)
+void LightTracer::render(shared_ptr<Camera> camera, shared_ptr<Film> film)
 {
-    launchParams.width = film->getWidth();
-    launchParams.height = film->getHeight();
-    launchParams.colorBuffer = film->getfPtr();
-    launchParams.camera = *camera;
+    film->memset_f0();
+    params.spp = spp;
+    params.background = background;
+    params.width = film->get_width();
+    params.height = film->get_height();
+    params.buffer = film->get_fptr();
+    params.camera = *camera;
 
-    GPUMemory<LaunchParams<BDPTPath*> > launchParamsBuffer;
-    launchParamsBuffer.resize_and_copy_from_host(&launchParams, 1);
+    GPUMemory<LaunchParams<int> > params_buffer;
+    params_buffer.resize_and_copy_from_host(&params, 1);
 
     OPTIX_CHECK(optixLaunch(
         pipelines[0],
         stream,
-        (CUdeviceptr)launchParamsBuffer.data(),
-        launchParamsBuffer.size() * sizeof(LaunchParams<BDPTPath*>),
+        (CUdeviceptr)params_buffer.data(),
+        params_buffer.size() * sizeof(LaunchParams<int>),
         &sbts[0],
-        sqrtNumLightPaths,
-        sqrtNumLightPaths,
+        params.width,
+        params.height,
+        1));
+    checkCudaErrors(cudaDeviceSynchronize());
+
+    params.frame++;
+}
+
+DirectLight::DirectLight(const Scene* _scene)
+    : OptixRayTracer({ "direct_light.ptx" }, _scene)
+{
+    params.traversable = traversable;
+    params.light = light;
+}
+
+void DirectLight::render(shared_ptr<Camera> camera, shared_ptr<Film> film)
+{
+    params.spp = spp;
+    params.background = background;
+    params.width = film->get_width();
+    params.height = film->get_height();
+    params.buffer = film->get_fptr();
+    params.camera = *camera;
+
+    GPUMemory<LaunchParams<int> > params_buffer;
+    params_buffer.resize_and_copy_from_host(&params, 1);
+
+    OPTIX_CHECK(optixLaunch(
+        pipelines[0],
+        stream,
+        (CUdeviceptr)params_buffer.data(),
+        params_buffer.size() * sizeof(LaunchParams<int>),
+        &sbts[0],
+        params.width,
+        params.height,
+        1));
+    checkCudaErrors(cudaDeviceSynchronize());
+
+    params.frame++;
+}
+
+BDPT::BDPT(const Scene* _scene, int _sqrt_num_light_paths)
+    : OptixRayTracer({ "lightPath.ptx", "cameraPath.ptx" }, _scene), sqrt_num_light_paths(_sqrt_num_light_paths)
+{
+    params.traversable = traversable;
+    params.light = light;
+
+    light_paths.resize(sqrt_num_light_paths * sqrt_num_light_paths);
+    params.extra = light_paths.data();
+}
+
+void BDPT::render(shared_ptr<Camera> camera, shared_ptr<Film> film)
+{
+    params.spp = spp;
+    params.background = background;
+    params.width = film->get_width();
+    params.height = film->get_height();
+    params.buffer = film->get_fptr();
+    params.camera = *camera;
+
+    GPUMemory<LaunchParams<BDPTPath*> > params_buffer;
+    params_buffer.resize_and_copy_from_host(&params, 1);
+
+    OPTIX_CHECK(optixLaunch(
+        pipelines[0],
+        stream,
+        (CUdeviceptr)params_buffer.data(),
+        params_buffer.size() * sizeof(LaunchParams<BDPTPath*>),
+        &sbts[0],
+        sqrt_num_light_paths,
+        sqrt_num_light_paths,
         1));
     checkCudaErrors(cudaDeviceSynchronize());
 
     OPTIX_CHECK(optixLaunch(
         pipelines[1],
         stream,
-        (CUdeviceptr)launchParamsBuffer.data(),
-        launchParamsBuffer.size() * sizeof(LaunchParams<BDPTPath*>),
+        (CUdeviceptr)params_buffer.data(),
+        params_buffer.size() * sizeof(LaunchParams<BDPTPath*>),
         &sbts[1],
-        launchParams.width,
-        launchParams.height,
+        params.width,
+        params.height,
         1));
     checkCudaErrors(cudaDeviceSynchronize());
 
-    launchParams.frameId++;
+    params.frame++;
 }
 
-// ReSTIR_DI::ReSTIR_DI(const Model* _model)
-//     : OptixRayTracer({ "pathTracer.ptx" }, _model)
+// ReSTIR_DI::ReSTIR_DI(const Model* _scene)
+//     : OptixRayTracer({ "pathTracer.ptx" }, _scene)
 // {
 //     launchParams.traversable = traversable;
 //     launchParams.light = light;
 // }
 
-// void ReSTIR_DI::render(std::shared_ptr<Camera> camera, std::shared_ptr<Film> film)
+// void ReSTIR_DI::render(shared_ptr<Camera> camera, shared_ptr<Film> film)
 // {
-//     launchParams.width = film->getWidth();
-//     launchParams.height = film->getHeight();
-//     launchParams.colorBuffer = film->getfPtr();
+//     launchParams.width = film->get_width();
+//     launchParams.height = film->get_height();
+//     launchParams.buffer = film->get_fptr();
 //     launchParams.camera = *camera;
 
 //     GPUMemory<LaunchParams<int> > launchParamsBuffer;
@@ -191,5 +245,5 @@ void BDPT::render(std::shared_ptr<Camera> camera, std::shared_ptr<Film> film)
 //         1));
 //     checkCudaErrors(cudaDeviceSynchronize());
 
-//     launchParams.frameId++;
+//     launchParams.frame++;
 // }

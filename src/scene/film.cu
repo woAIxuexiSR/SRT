@@ -1,6 +1,6 @@
 #include "film.h"
 
-__global__ void fToUchar_k(int n_elements, float4* __restrict__ src, uchar4* __restrict__ dst)
+__global__ void f_to_uchar_k(int n_elements, float4* __restrict__ src, uchar4* __restrict__ dst)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_elements) return;
@@ -11,7 +11,7 @@ __global__ void fToUchar_k(int n_elements, float4* __restrict__ src, uchar4* __r
     dst[i] = make_uchar4(v.x, v.y, v.z, v.w);
 }
 
-__global__ void flipfVertical_k(int n_elements, int width, int height, float4* __restrict__ src, float4* __restrict__ dst)
+__global__ void flip_f_vertical_k(int n_elements, int width, int height, float4* __restrict__ src, float4* __restrict__ dst)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_elements) return;
@@ -19,36 +19,48 @@ __global__ void flipfVertical_k(int n_elements, int width, int height, float4* _
     dst[i] = src[(height - y - 1) * width + x];
 }
 
-void Film::fToUchar()
+void Film::resize(int w, int h)
+{
+    width = w, height = h;
+    pixels_f.resize(width * height);
+    pixels_u.resize(width * height);
+}
+
+void Film::memset_f0()
+{
+    pixels_f.memset(0);
+}
+
+void Film::f_to_uchar()
 {
     int pixel_num = width * height;
-    tcnn::linear_kernel(fToUchar_k, 0, 0, pixel_num, pixels_f.data(), pixels_u.data());
+    tcnn::linear_kernel(f_to_uchar_k, 0, 0, pixel_num, pixels_f.data(), pixels_u.data());
     checkCudaErrors(cudaDeviceSynchronize());
 }
 
-void Film::save_png(const std::string& filename) const
+void Film::save_png(const string& filename) const
 {
-    std::vector<uchar4> pixels_cpu(width * height);
+    vector<uchar4> pixels_cpu(width * height);
     pixels_u.copy_to_host(pixels_cpu);
 
     stbi_flip_vertically_on_write(true);
     int ret = stbi_write_png(filename.c_str(), width, height, 4, (void*)pixels_cpu.data(), 0);
     if (ret == 0)
-        std::cout << "Failed to save image: " << filename << std::endl;
+        cout << "Failed to save image: " << filename << endl;
 }
 
-void Film::save_jpg(const std::string& filename) const
+void Film::save_jpg(const string& filename) const
 {
-    std::vector<uchar4> pixels_cpu(width * height);
+    vector<uchar4> pixels_cpu(width * height);
     pixels_u.copy_to_host(pixels_cpu);
 
     stbi_flip_vertically_on_write(true);
     int ret = stbi_write_jpg(filename.c_str(), width, height, 4, (void*)pixels_cpu.data(), 100);
     if (ret == 0)
-        std::cout << "Failed to save image: " << filename << std::endl;
+        cout << "Failed to save image: " << filename << endl;
 }
 
-void Film::save_exr(const std::string& filename) const
+void Film::save_exr(const string& filename) const
 {
     EXRHeader header;
     InitEXRHeader(&header);
@@ -56,15 +68,15 @@ void Film::save_exr(const std::string& filename) const
     InitEXRImage(&image);
 
     GPUMemory<float4> flipped(width * height);
-    tcnn::linear_kernel(flipfVertical_k, 0, 0, width * height, width, height, pixels_f.data(), flipped.data());
-    std::vector<float4> pixels_cpu(width * height);
+    tcnn::linear_kernel(flip_f_vertical_k, 0, 0, width * height, width, height, pixels_f.data(), flipped.data());
+    vector<float4> pixels_cpu(width * height);
     flipped.copy_to_host(pixels_cpu);
 
-    std::vector<float> images[4]{
-        std::vector<float>(width * height),
-        std::vector<float>(width * height),
-        std::vector<float>(width * height),
-        std::vector<float>(width * height)
+    vector<float> images[4]{
+        vector<float>(width * height),
+        vector<float>(width * height),
+        vector<float>(width * height),
+        vector<float>(width * height)
     };
     for (int i = 0; i < width * height; i++)
     {
@@ -101,14 +113,9 @@ void Film::save_exr(const std::string& filename) const
     const char* err;
     int ret = SaveEXRImageToFile(&image, &header, filename.c_str(), &err);
     if (ret != TINYEXR_SUCCESS)
-        std::cout << "Failed to save image: " << filename << std::endl;
+        cout << "Failed to save image: " << filename << endl;
 
     free(header.channels);
     free(header.pixel_types);
     free(header.requested_pixel_types);
-}
-
-void Film::memset_0()
-{
-    pixels_f.memset(0);
 }
