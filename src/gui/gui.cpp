@@ -143,8 +143,9 @@ Gui::Gui(int _w, int _h, string name, shared_ptr<Camera> _c)
                 ud->last_y = static_cast<float>(y);
                 ud->first_mouse = false;
             }
-            float xoffset = static_cast<float>(x) - ud->last_x;
-            float yoffset = ud->last_y - static_cast<float>(y);
+            float cursor_speed = 0.04f;
+            float xoffset = (static_cast<float>(x) - ud->last_x) * cursor_speed;
+            float yoffset = (ud->last_y - static_cast<float>(y)) * cursor_speed;
             ud->last_x = static_cast<float>(x);
             ud->last_y = static_cast<float>(y);
             ud->camera->process_mouse_input(xoffset, yoffset);
@@ -208,6 +209,10 @@ void Gui::process_input()
         ud->camera->process_keyboard_input(ACTION::LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         ud->camera->process_keyboard_input(ACTION::RIGHT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+        ud->camera->process_keyboard_input(ACTION::FRONT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+        ud->camera->process_keyboard_input(ACTION::BACK, deltaTime);
     ud->last_time = static_cast<float>(glfwGetTime());
 }
 
@@ -250,18 +255,19 @@ void MaterialAdjustGui::run(unsigned char* data)
     ImGui::Text("Application average %.1f FPS", ImGui::GetIO().Framerate);
     // ImGui::DragFloat("radius", &user_data.camera->radius, 0.2f, 1.0f, 30.0f);
 
-    ImGui::DragFloat("ior", &mat->params[0], 0.02f, 0.5f, 1.5f);
-    ImGui::DragFloat("metallic", &mat->params[1], 0.02f, 0.0f, 1.0f);
-    ImGui::DragFloat("subsurface", &mat->params[2], 0.02f, 0.0f, 1.0f);
-    ImGui::DragFloat("roughness", &mat->params[3], 0.02f, 0.0f, 1.0f);
-    ImGui::DragFloat("specular", &mat->params[4], 0.02f, 0.0f, 1.0f);
-    ImGui::DragFloat("specularTint", &mat->params[5], 0.02f, 0.0f, 1.0f);
-    ImGui::DragFloat("anisotropic", &mat->params[6], 0.02f, 0.0f, 1.0f);
-    ImGui::DragFloat("sheen", &mat->params[7], 0.02f, 0.0f, 1.0f);
-    ImGui::DragFloat("sheenTint", &mat->params[8], 0.02f, 0.0f, 1.0f);
-    ImGui::DragFloat("clearcoat", &mat->params[9], 0.02f, 0.0f, 1.0f);
-    ImGui::DragFloat("clearcoatGloss", &mat->params[10], 0.02f, 0.0f, 1.0f);
-    ImGui::DragFloat("specTrans", &mat->params[11], 0.02f, 0.0f, 1.0f);
+    ImGui::ColorEdit3("color", &mat->color.x);
+    ImGui::SliderFloat("ior", &mat->params[0], 0.5f, 1.5f);
+    ImGui::SliderFloat("metallic", &mat->params[1], 0.0f, 1.0f);
+    ImGui::SliderFloat("subsurface", &mat->params[2], 0.0f, 1.0f);
+    ImGui::SliderFloat("roughness", &mat->params[3], 0.0f, 1.0f);
+    ImGui::SliderFloat("specular", &mat->params[4], 0.0f, 1.0f);
+    ImGui::SliderFloat("specularTint", &mat->params[5], 0.0f, 1.0f);
+    ImGui::SliderFloat("anisotropic", &mat->params[6], 0.0f, 1.0f);
+    ImGui::SliderFloat("sheen", &mat->params[7], 0.0f, 1.0f);
+    ImGui::SliderFloat("sheenTint", &mat->params[8], 0.0f, 1.0f);
+    ImGui::SliderFloat("clearcoat", &mat->params[9], 0.0f, 1.0f);
+    ImGui::SliderFloat("clearcoatGloss", &mat->params[10], 0.0f, 1.0f);
+    ImGui::SliderFloat("specTrans", &mat->params[11], 0.0f, 1.0f);
 
     ImGui::End();
 

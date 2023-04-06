@@ -30,8 +30,13 @@ extern "C" __global__ void __closesthit__radiance()
     HitInfo& prd = *(HitInfo*)getPRD<HitInfo>();
     prd.hit = true;
     prd.pos = v0 * (1.0f - uv.x - uv.y) + v1 * uv.x + v2 * uv.y;
-    prd.mat = &params.extra;
-    prd.color = params.extra.get_color();
+    prd.mat = &sbtData.mat;
+    prd.color = sbtData.mat.get_color();
+    if (sbtData.mesh_id == 5)
+    {
+        prd.mat = &params.extra;
+        prd.color = params.extra.get_color();
+    }
 
     float3 norm;
     if (sbtData.normal)
@@ -39,8 +44,12 @@ extern "C" __global__ void __closesthit__radiance()
     else
         norm = cross(v1 - v0, v2 - v0);
     prd.normal = normalize(norm);
-    if (!prd.mat->is_transmissive() && dot(prd.normal, ray_dir) > 0.0f)
+    prd.inner = false;
+    if (dot(prd.normal, ray_dir) > 0.0f)
+    {
         prd.normal = -prd.normal;
+        prd.inner = true;
+    }
 
     if (sbtData.has_texture && sbtData.texcoord)
     {
@@ -50,7 +59,11 @@ extern "C" __global__ void __closesthit__radiance()
     }
 }
 
-extern "C" __global__ void __closesthit__shadow() {}
+extern "C" __global__ void __closesthit__shadow()
+{
+    int& prd = *getPRD<int>();
+    prd = 0;
+}
 
 extern "C" __global__ void __anyhit__radiance() {}
 
@@ -62,7 +75,11 @@ extern "C" __global__ void __miss__radiance()
     prd.hit = false;
 }
 
-extern "C" __global__ void __miss__shadow() {}
+extern "C" __global__ void __miss__shadow()
+{
+    int& prd = *getPRD<int>();
+    prd = 1;
+}
 
 extern "C" __global__ void __raygen__()
 {
@@ -72,8 +89,8 @@ extern "C" __global__ void __raygen__()
     RandomGenerator rng(params.frame * params.height + iy, ix);
     Camera& camera = params.camera;
 
-    HitInfo info;
-    thrust::pair<unsigned, unsigned> u = pack_pointer(&info);
+    HitInfo info; int visible = 1;
+    thrust::pair<unsigned, unsigned> u = pack_pointer(&info), v = pack_pointer(&visible);
 
     float3 result = make_float3(0.0f);
     for (int i = 0; i < params.spp; i++)
@@ -82,29 +99,39 @@ extern "C" __global__ void __raygen__()
         float yy = (iy + rng.random_float()) / params.height;
         Ray ray = camera.get_ray(xx, yy);
 
-        optixTrace(params.traversable, ray.pos, ray.dir, 1e-3f, 1e16f, 0.0f,
-            OptixVisibilityMask(255), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-            RADIANCE_RAY_TYPE, RAY_TYPE_COUNT, RADIANCE_RAY_TYPE,
-            u.first, u.second);
-
-        float3 L = make_float3(1.0f);
-
-        if (info.hit)
+        float3 L = make_float3(0.0f), beta = make_float3(1.0f);
+        bool specular = true;
+        for (int depth = 0; depth < MAX_DEPTH; depth++)
         {
-            MaterialSample ms;
-            ms.type = ReflectionType::Diffuse;
-            Onb onb(info.normal);
-            float3 w = cosine_sample_hemisphere(rng.random_float2());
-            ms.wi = normalize(onb(w));
-            ms.pdf = cosine_hemisphere_pdf(dot(info.normal, ms.wi));
-            ms.f = info.mat->eval(ms.wi, -ray.dir, info.normal, info.color);
+            optixTrace(params.traversable, ray.pos, ray.dir, 1e-3f, 1e16f, 0.0f,
+                OptixVisibilityMask(255), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+                RADIANCE_RAY_TYPE, RAY_TYPE_COUNT, RADIANCE_RAY_TYPE,
+                u.first, u.second);
+
+            if (specular)
+            {
+                if (info.hit && info.mat->is_emissive())
+                    L += beta * info.mat->get_emission();
+                else if (!info.hit)
+                    L += beta * params.background;
+            }
+            if (!info.hit || info.mat->is_emissive())
+                break;
+
+            MaterialSample ms = info.mat->sample(-ray.dir, info.normal, rng.random_float2(), info.color, info.inner);
 
             if (ms.pdf <= 1e-5f) break;
-            float cosine = abs(dot(ms.wi, info.normal));
-            L = ms.f * cosine / ms.pdf;
-            // printf("%f %f %f, %f, %f, %f %f %f\n", ms.f.x, ms.f.y, ms.f.z, cosine, ms.pdf, L.x, L.y, L.z);
-        }
+            beta *= ms.f * abs(dot(ms.wi, info.normal)) / ms.pdf;
+            specular = true;
+            ray = Ray(info.pos, ms.wi);
 
+            if (depth >= 4)
+            {
+                float p = max(beta.x, max(beta.y, beta.z));
+                if (rng.random_float() > p) break;
+                beta /= p;
+            }
+        }
         result += L / params.spp;
     }
 

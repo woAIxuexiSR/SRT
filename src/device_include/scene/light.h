@@ -53,13 +53,13 @@ public:
                 float3 normal = normals[index.x] * (1.0f - p.x - p.y) + normals[index.y] * p.x + normals[index.z] * p.y;
                 if(length(normals[index.x]) < 0.1f)
                     normal = cross(vertices[index.y] - vertices[index.x], vertices[index.z] - vertices[index.x]);
-                return LightSample(pos, normalize(normal), emission[i], pdf());
+                return LightSample(pos, normalize(normal), emission[i], sample_pdf());
             }
         }
         return LightSample();
     }
 
-    __device__ inline float pdf()
+    __device__ inline float sample_pdf()
     {
         return 1.0f / total_area;
     }

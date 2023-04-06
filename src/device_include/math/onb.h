@@ -21,8 +21,13 @@ public:
         V = cross(N, U);
     }
 
-    __device__ float3 operator()(float3 p) const
+    __device__ float3 to_world(float3 p) const
     {
         return p.x * U + p.y * V + p.z * N;
+    }
+
+    __device__ float3 to_local(float3 p) const
+    {
+        return make_float3(dot(p, U), dot(p, V), dot(p, N));
     }
 };

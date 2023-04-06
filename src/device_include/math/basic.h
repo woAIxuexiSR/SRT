@@ -125,6 +125,16 @@ __host__ __device__ inline float schlick_fresnel(float cos_theta, float eta = 1.
     return r0 + (1.0f - r0) * m * m * m * m * m;
 }
 
+__host__ __device__ inline float fresnel_mix(float metallic, float eta, float cos_theta)
+{
+    return lerp(schlick_fresnel(cos_theta, eta), schlick_fresnel(cos_theta), metallic);
+}
+
+__host__ __device__ inline float luminance(float3 color)
+{
+    return dot(color, make_float3(0.2126f, 0.7152f, 0.0722f));
+}
+
 __host__ __device__ inline float GTR1(float n_h, float a)
 {
     if (a >= 1.0f) return M_1_PI;
@@ -145,4 +155,52 @@ __host__ __device__ inline float smithG_GGX(float n_v, float alphaG)
     float a = alphaG * alphaG;
     float b = n_v * n_v;
     return (2.0f * n_v) / (n_v + sqrt(a + b - a * b));
+}
+
+__host__ __device__ inline float3 sample_GGX_VNDF(float3 V, float roughness, float2 sample)
+{
+    // to be checked
+    float3 Vh = normalize(make_float3(roughness * V.x, roughness * V.y, V.z));
+
+    float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
+    float3 T1 = lensq > 0.0f ? make_float3(-Vh.y, Vh.x, 0.0f) * rsqrtf(lensq) : make_float3(1.0f, 0.0f, 0.0f);
+    float3 T2 = cross(Vh, T1);
+
+    float r = sqrt(sample.x);
+    float phi = 2.0f * M_PI * sample.y;
+    float t1 = r * cos(phi);
+    float t2 = r * sin(phi);
+    float s = 0.5f * (1.0f + Vh.z);
+    t2 = (1.0f - s) * sqrt(1.0f - t1 * t1) + s * t2;
+
+    float3 Nh = t1 * T1 + t2 * T2 + sqrt(max(0.0f, 1.0f - t1 * t1 - t2 * t2)) * Vh;
+    return normalize(make_float3(roughness * Nh.x, roughness * Nh.y, max(0.0f, Nh.z)));
+}
+
+__host__ __device__ inline float3 sample_GTR1(float a, float2 sample)
+{
+    if (a >= 1.0f) return cosine_sample_hemisphere(sample);
+    float a2 = a * a;
+    float phi = 2.0f * M_PI * sample.x;
+    float cos_theta = sqrt((1.0f - pow(a2, 1.0f - sample.y)) / (1.0f - a2));
+    float sin_theta = clamp(sqrt(1.0f - (cos_theta * cos_theta)), 0.0f, 1.0f);
+    return make_float3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
+}
+
+__host__ __device__ inline float3 sample_GTR2(float a, float2 sample)
+{
+    float a2 = a * a;
+    float phi = 2.0f * M_PI * sample.x;
+    float sin_theta = sqrt(a2 / (1.0f / sample.y - 1.0f + a2));
+    float cos_theta = clamp(sqrt(1.0f - (sin_theta * sin_theta)), 0.0f, 1.0f);
+    return make_float3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
+}
+
+__host__ __device__ inline float3 refract(float3 i, float3 n, float eta)
+{
+    float n_i = dot(n, -i);
+    float k = 1.0f - eta * eta * (1.0f - n_i * n_i);
+    if (k < 0.0f)
+        return make_float3(0.0f);
+    return eta * i + (eta * n_i - sqrt(k)) * n;
 }

@@ -285,6 +285,22 @@ void Scene::load_from_model(const string& filename)
             material->emission = make_float3(emissive.r, emissive.g, emissive.b);
             material->color = make_float3(diffuse.r, diffuse.g, diffuse.b);
         }
+        else if(i == 5)
+        {
+            // material->type = MaterialType::Dielectric;
+            // material->color = make_float3(2.0f);
+            material->type = MaterialType::Disney;
+            // material->color = make_float3(0.099, 0.24, 0.134);
+            // material->params[1] = 0.5f;
+            // material->params[2] = 0.5f;
+            // material->params[3] = 0.5f;
+            // material->params[9] = 0.5f;
+            // material->params[10] = 1.0f;
+            // material->params[11] = 0.5f;
+            material->color = make_float3(2.0f);
+            material->params[3] = 0.001f;
+            material->params[11] = 1.0f;
+        }
         else
         {
             material->type = MaterialType::Diffuse;

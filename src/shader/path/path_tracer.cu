@@ -39,8 +39,12 @@ extern "C" __global__ void __closesthit__radiance()
     else
         norm = cross(v1 - v0, v2 - v0);
     prd.normal = normalize(norm);
-    if(!prd.mat->is_transmissive() && dot(prd.normal, ray_dir) > 0.0f)
+    prd.inner = false;
+    if (dot(prd.normal, ray_dir) > 0.0f)
+    {
         prd.normal = -prd.normal;
+        prd.inner = true;
+    }
 
     if (sbtData.has_texture && sbtData.texcoord)
     {
@@ -81,7 +85,7 @@ extern "C" __global__ void __raygen__()
     Camera& camera = params.camera;
     Light& light = params.light;
 
-    HitInfo info; int visible = 1;
+    HitInfo info; int visible;
     thrust::pair<unsigned, unsigned> u = pack_pointer(&info), v = pack_pointer(&visible);
 
     float3 result = make_float3(0.0f);
@@ -93,6 +97,7 @@ extern "C" __global__ void __raygen__()
 
         float3 L = make_float3(0.0f), beta = make_float3(1.0f);
         bool specular = true;
+        float scatter_pdf = 1.0f;
         for (int depth = 0; depth < MAX_DEPTH; depth++)
         {
             optixTrace(params.traversable, ray.pos, ray.dir, 1e-3f, 1e16f, 0.0f,
@@ -100,24 +105,36 @@ extern "C" __global__ void __raygen__()
                 RADIANCE_RAY_TYPE, RAY_TYPE_COUNT, RADIANCE_RAY_TYPE,
                 u.first, u.second);
 
-            if (specular)
+            if (!info.hit)
             {
-                if (info.hit && info.mat->is_emissive())
-                    L += beta * info.mat->get_emission();
-                else if (!info.hit)
-                    L += beta * params.background;
+                L += beta * params.background;
+                break;
             }
 
-            if (!info.hit || info.mat->is_emissive())
+            if (info.hit && info.mat->is_emissive())
+            {
+                if (info.inner)
+                    break;
+                if (specular)
+                    L += beta * info.mat->get_emission();
+                else
+                {
+                    float t2 = dot(info.pos - ray.pos, info.pos - ray.pos);
+                    float light_pdf = light.sample_pdf() * t2 / dot(info.normal, -ray.dir);
+                    float mis_weight = scatter_pdf / (scatter_pdf + light_pdf);
+                    L += beta * info.mat->get_emission() * mis_weight;
+                }
                 break;
+            }
 
             if (!info.mat->is_specular())
             {
                 LightSample ls = light.sample(rng.random_float2());
                 Ray shadow_ray(info.pos, normalize(ls.pos - info.pos));
 
-                float cos_theta = dot(ls.normal, -shadow_ray.dir);
-                if (cos_theta > 0.0f)
+                float cos_i = dot(info.normal, shadow_ray.dir);
+                float cos_light = dot(ls.normal, -shadow_ray.dir);
+                if ((cos_light > 0.0f) && (cos_i > 0.0f || info.mat->is_transmissive()))
                 {
                     float t = length(ls.pos - info.pos);
                     optixTrace(params.traversable, shadow_ray.pos, shadow_ray.dir, 1e-3f, t - 1e-3f, 0.0f,
@@ -126,21 +143,23 @@ extern "C" __global__ void __raygen__()
                         v.first, v.second);
 
                     if (visible)
-                        L += beta * info.mat->eval(shadow_ray.dir, -ray.dir, info.normal, info.color)
-                            * dot(info.normal, shadow_ray.dir) * ls.emission / (ls.pdf * t * t / cos_theta);
+                    {
+                        float light_pdf = ls.pdf * t * t / cos_light;
+                        float mat_pdf = info.mat->sample_pdf(shadow_ray.dir, -ray.dir, info.normal, info.color, info.inner);
+                        float mis_weight = light_pdf / (light_pdf + mat_pdf);
+                        L += beta * info.mat->eval(shadow_ray.dir, -ray.dir, info.normal, info.color, info.inner)
+                            * abs(cos_i) * ls.emission * mis_weight / light_pdf;
+                    }
                 }
             }
 
-            MaterialSample ms = info.mat->sample(-ray.dir, info.normal, rng.random_float2(), info.color);
-            ms.type = ReflectionType::Specular;
-            ms.wi = normalize(info.normal + uniform_sample_sphere(rng.random_float2()));
-            ms.pdf = cosine_hemisphere_pdf(dot(info.normal, ms.wi));
-            ms.f = info.mat->eval(ms.wi, -ray.dir, info.normal, info.color);
+            MaterialSample ms = info.mat->sample(-ray.dir, info.normal, rng.random_float2(), info.color, info.inner);
 
             if (ms.pdf <= 1e-5f) break;
             beta *= ms.f * abs(dot(ms.wi, info.normal)) / ms.pdf;
             specular = (ms.type == ReflectionType::Specular);
             ray = Ray(info.pos, ms.wi);
+            scatter_pdf = ms.pdf;
 
             if (depth >= 3)
             {

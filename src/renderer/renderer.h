@@ -30,13 +30,29 @@ public:
 class InteractiveRender
 {
 private:
+    RenderParams params;
     shared_ptr<Film> film;
     shared_ptr<Camera> camera;
     shared_ptr<OptixRayTracer> ray_tracer;
     shared_ptr<InteractiveGui> gui;
 
 public:
-    InteractiveRender(RenderParams params, shared_ptr<Scene> scene);
+    InteractiveRender(RenderParams _params, shared_ptr<Scene> scene);
+
+    void render();
+};
+
+class ComparisonRender
+{
+private:
+    ComparisonRenderParams params;
+    shared_ptr<Film> film_1, film_2;
+    shared_ptr<Camera> camera;
+    shared_ptr<OptixRayTracer> ray_tracer_1, ray_tracer_2;
+    shared_ptr<ComparisonGui> gui;
+
+public:
+    ComparisonRender(ComparisonRenderParams _params, shared_ptr<Scene> scene);
 
     void render();
 };

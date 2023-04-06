@@ -36,6 +36,7 @@ struct HitInfo
     bool hit;
     float3 pos;
     float3 normal;
+    bool inner;
     const Material* mat;
     float3 color;
 };

@@ -94,7 +94,7 @@ public:
     void process_mouse_input(float xoffset, float yoffset)
     {
         SquareMatrix<4> m = get_transform();
-        m = m * RotateX(yoffset * 0.1f) * RotateY(xoffset * 0.1f);
+        m = m * RotateX(radians(-yoffset)) * RotateY(radians(xoffset));
 
         front = make_float3(m * make_float4(0.0f, 0.0f, 1.0f, 0.0f));
         up = make_float3(m * make_float4(0.0f, 1.0f, 0.0f, 0.0f));

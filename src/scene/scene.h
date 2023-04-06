@@ -18,6 +18,16 @@ public:
     float fov;
 };
 
+class ComparisonRenderParams
+{
+public:
+    int width, height;
+    int spp_1, spp_2;
+    string method_1, method_2;
+    SquareMatrix<4> transform;
+    float fov;
+};
+
 
 class TriangleMesh
 {
@@ -64,6 +74,7 @@ public:
 public:
     Scene() {}
 
+    // pbrd method
     void add_mesh(const string& type, const unordered_map<string, string>& params, int material_id, SquareMatrix<4> transform);
     int add_texture(const string& type, const unordered_map<string, string>& params);
     int add_named_material(const string& name, const unordered_map<string, string>& params);
@@ -71,5 +82,9 @@ public:
     int add_light_material(const string& type, const unordered_map<string, string>& params);
     int get_material_id(const string& name);
 
+    // obj etc. method
     void load_from_model(const string& filename);
+
+    // build from code
+    void add_quad_light(float3 center, float3 normal, float3 size, float3 emission);
 };
