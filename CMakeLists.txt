@@ -103,7 +103,8 @@ set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
 set(PTX_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin/ptx")
 
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
-add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
+add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>)
+# add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
 
 list(APPEND PROJECT_INCLUDE 
     ${OPENGL_INCLUDE}

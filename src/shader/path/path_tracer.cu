@@ -98,6 +98,7 @@ extern "C" __global__ void __raygen__()
         float3 L = make_float3(0.0f), beta = make_float3(1.0f);
         bool specular = true;
         float scatter_pdf = 1.0f;
+        float cos_theta = 1.0f;
         for (int depth = 0; depth < MAX_DEPTH; depth++)
         {
             optixTrace(params.traversable, ray.pos, ray.dir, 1e-3f, 1e16f, 0.0f,
@@ -121,7 +122,9 @@ extern "C" __global__ void __raygen__()
                 {
                     float t2 = dot(info.pos - ray.pos, info.pos - ray.pos);
                     float light_pdf = light.sample_pdf() * t2 / dot(info.normal, -ray.dir);
-                    float mis_weight = scatter_pdf / (scatter_pdf + light_pdf);
+                    // float mat_pdf = scatter_pdf;
+                    float mat_pdf = cosine_hemisphere_pdf(cos_theta);
+                    float mis_weight = mat_pdf / (light_pdf + mat_pdf);
                     L += beta * info.mat->get_emission() * mis_weight;
                 }
                 break;
@@ -145,7 +148,8 @@ extern "C" __global__ void __raygen__()
                     if (visible)
                     {
                         float light_pdf = ls.pdf * t * t / cos_light;
-                        float mat_pdf = info.mat->sample_pdf(shadow_ray.dir, -ray.dir, info.normal, info.color, info.inner);
+                        // float mat_pdf = info.mat->sample_pdf(shadow_ray.dir, -ray.dir, info.normal, info.color, info.inner);
+                        float mat_pdf = cosine_hemisphere_pdf(dot(info.normal, shadow_ray.dir));
                         float mis_weight = light_pdf / (light_pdf + mat_pdf);
                         L += beta * info.mat->eval(shadow_ray.dir, -ray.dir, info.normal, info.color, info.inner)
                             * abs(cos_i) * ls.emission * mis_weight / light_pdf;
@@ -157,6 +161,7 @@ extern "C" __global__ void __raygen__()
 
             if (ms.pdf <= 1e-5f) break;
             beta *= ms.f * abs(dot(ms.wi, info.normal)) / ms.pdf;
+            cos_theta = dot(ms.wi, info.normal);
             specular = (ms.type == ReflectionType::Specular);
             ray = Ray(info.pos, ms.wi);
             scatter_pdf = ms.pdf;

@@ -59,12 +59,14 @@ InteractiveRender::InteractiveRender(RenderParams _params, shared_ptr<Scene> sce
 
 void InteractiveRender::render()
 {
+    std::fstream f("framerate.txt", std::ios::out);
     while (!gui->should_close())
     {
         ray_tracer->render(camera, film);
         film->f_to_uchar();
-        gui->run((unsigned char*)film->get_uptr());
+        gui->run((unsigned char*)film->get_uptr(), f);
     }
+    f.close();
 }
 
 ComparisonRender::ComparisonRender(ComparisonRenderParams _params, shared_ptr<Scene> scene): params(_params)

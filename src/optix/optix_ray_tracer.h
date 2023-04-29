@@ -37,7 +37,6 @@ protected:
     vector<GPUMemory<float2> > texcoordBuffer;
     vector<GPUMemory<float3> > normalBuffer;
 
-    Light light;
     GPUMemory<float3> lightVertexBuffer;
     GPUMemory<float3> lightNormalBuffer;
     GPUMemory<uint3> lightIndexBuffer;
@@ -70,6 +69,7 @@ protected:
 
 public:
     int spp {4};
+    Light light;
     float3 background{ 0.0f, 0.0f, 0.0f };
 
 public:

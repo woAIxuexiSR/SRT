@@ -327,7 +327,7 @@ InteractiveGui::~InteractiveGui()
     glDeleteTextures(1, &tex_id);
 }
 
-void InteractiveGui::run(unsigned char* data)
+void InteractiveGui::run(unsigned char* data, std::fstream& file)
 {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -337,6 +337,7 @@ void InteractiveGui::run(unsigned char* data)
     ImGui::Text("Application Time %.1f s", glfwGetTime());
     ImGui::Text("Application average %.1f FPS", ImGui::GetIO().Framerate);
     // ImGui::DragFloat("radius", &user_data.camera->radius, 0.2f, 1.0f, 30.0f);
+    file << ImGui::GetIO().Framerate << std::endl;
 
     ImGui::End();
 

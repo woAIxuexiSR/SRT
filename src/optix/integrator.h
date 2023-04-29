@@ -85,12 +85,3 @@ public:
 // };
 
 
-class Wavefront: public OptixRayTracer
-{
-private:
-
-public:
-    Wavefront(const Scene* _scene);
-    virtual void render(shared_ptr<Camera> camera, shared_ptr<Film> film) override;
-};
-

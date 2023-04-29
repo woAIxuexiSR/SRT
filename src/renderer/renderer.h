@@ -8,6 +8,7 @@
 #include "film.h"
 #include "scene.h"
 #include "integrator.h"
+#include "wavefront.h"
 #include "scene/camera.h"
 
 

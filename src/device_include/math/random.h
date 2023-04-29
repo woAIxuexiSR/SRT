@@ -11,7 +11,14 @@ private:
     curandState state;
 
 public:
+    __device__ RandomGenerator() {}
+
     __device__ RandomGenerator(unsigned long long seed, unsigned long long seq)
+    {
+        curand_init(seed, seq, 0, &state);
+    }
+
+    __device__ void init(unsigned long long seed, unsigned long long seq)
     {
         curand_init(seed, seq, 0, &state);
     }

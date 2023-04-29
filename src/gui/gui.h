@@ -77,7 +77,7 @@ private:
 public:
     InteractiveGui(int _w, int _h, shared_ptr<Camera> _c);
     ~InteractiveGui();
-    void run(unsigned char* data);
+    void run(unsigned char* data, std::fstream& file);
 };
 
 

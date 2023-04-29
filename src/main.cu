@@ -2,13 +2,15 @@
 #include "renderer.h"
 #include "parser.h"
 #include "integrator.h"
+#include "wavefront.h"
 
 void test_render()
 {
     RenderParams params;
     params.width = 1920;
     params.height = 1080;
-    params.spp = 4;
+    params.spp = 128;
+    // params.method = "wavefront";
     params.method = "path";
     params.transform = LookAt(make_float3(0.0f, 1.0f, 5.5f), make_float3(0.0f, 1.0f, 0.5f), make_float3(0.0f, 1.0f, 0.0f));
     params.fov = 60.0f;
@@ -31,13 +33,13 @@ void test_render()
     auto scene = make_shared<Scene>();
     scene->load_from_model(modelPath.string());
 
-    // ImageRender image_render(params, scene, out_path.string());
-    // TICK(time);
-    // image_render.render();
-    // TOCK(time);
+    ImageRender image_render(params, scene, out_path.string());
+    TICK(time);
+    image_render.render();
+    TOCK(time);
 
-    InteractiveRender interactive_render(params, scene);
-    interactive_render.render();
+    // InteractiveRender interactive_render(params, scene);
+    // interactive_render.render();
 
     // std::filesystem::path video_path = out_path.parent_path() / "out.avi";
     // VideoRender video_render(params, scene, video_path.string());
@@ -84,15 +86,57 @@ void material_adjust()
     render.render();
 }
 
+void wavefront_test()
+{
+    RenderParams params;
+    params.width = 1920;
+    params.height = 1080;
+    params.spp = 128;
+    // params.method = "wavefront";
+    params.method = "path";
+    params.transform = LookAt(make_float3(0.0f, 1.0f, 5.5f), make_float3(0.0f, 1.0f, 0.5f), make_float3(0.0f, 1.0f, 0.0f));
+    params.fov = 60.0f;
+
+
+    std::filesystem::path currentPath(__FILE__);
+    std::filesystem::path modelPath;
+    // modelPath = currentPath.parent_path().parent_path() / "data" / "sphere" / "sphere.obj";
+    modelPath = currentPath.parent_path().parent_path() / "data" / "CornellBox" / "CornellBox-Original.obj";
+    // modelPath = currentPath.parent_path().parent_path() / "data" / "CornellBox" / "CornellBox-Glossy.obj";
+    // modelPath = currentPath.parent_path().parent_path() / "data" / "CornellBox" / "CornellBox-Mirror.obj";
+    // modelPath = currentPath.parent_path().parent_path() / "data" / "CornellBox" / "CornellBox-Water.obj";
+    // modelPath = currentPath.parent_path().parent_path() / "data" / "SimpleSphere" / "sphere.obj";
+    // modelPath = currentPath.parent_path().parent_path() / "data" / "sponza" / "sponza.obj";
+    // modelPath = currentPath.parent_path().parent_path() / "data" / "bathroom" / "salle_de_bain.obj";
+
+    std::filesystem::path out_path;
+    out_path = currentPath.parent_path().parent_path() / "data" / "wavefront.exr";
+
+    auto scene = make_shared<Scene>();
+    scene->load_from_model(modelPath.string());
+
+    string image_path = out_path.string();
+    shared_ptr<Film> film = make_shared<Film>(params.width, params.height);
+    shared_ptr<Camera> camera = make_shared<Camera>(params.transform, (float)params.width / (float)params.height, params.fov);
+
+    Wavefront wavefront(scene.get());
+    TICK(time);
+    wavefront.render(camera, film);
+    film->save_exr(image_path);
+    TOCK(time);
+
+}
+
 __global__ void kernel()
 {
 }
 
 int main()
 {
-    test_render();
+    // test_render();
     // comparison_render();
     // material_adjust();
+    wavefront_test();
 
     // kernel<<<1, 1>>>();
     // checkCudaErrors(cudaDeviceSynchronize());
