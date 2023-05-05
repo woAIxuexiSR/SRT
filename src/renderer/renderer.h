@@ -5,6 +5,8 @@
 #include "process.h"
 #include "integrator/integrator.h"
 #include "postprocess/accumulate.h"
+#include "postprocess/tonemapping.h"
+#include "postprocess/denoise.h"
 
 class Renderer
 {

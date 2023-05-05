@@ -11,7 +11,7 @@ private:
 
 public:
     AccumulateProcess(int _w, int _h, shared_ptr<Scene> _s = nullptr)
-        : RenderProcess(_w, _h, _s), frame_count(0), accumulated(_w* _h)
+        : frame_count(0), accumulated(_w* _h), RenderProcess(_w, _h, _s)
     {}
 
     virtual void render(shared_ptr<Film> film) override;
