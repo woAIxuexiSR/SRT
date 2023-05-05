@@ -1,11 +1,11 @@
 #include "gui.h"
 
-unsigned Gui::load_shader(GLenum type, std::string filepath)
+unsigned GUI::load_shader(GLenum type, string filename)
 {
-    std::fstream fs(filepath, std::ios::in);
+    std::fstream fs(filename, std::ios::in);
     if (!fs.is_open())
     {
-        std::cout << "Failed to open shader file " << filepath << std::endl;
+        std::cout << "ERROR::Failed to open shader file: " << filename << std::endl;
         exit(-1);
     }
 
@@ -16,8 +16,7 @@ unsigned Gui::load_shader(GLenum type, std::string filepath)
 
     const char* shader_source = str.c_str();
 
-    unsigned int shader_id;
-    shader_id = glCreateShader(type);
+    unsigned int shader_id = glCreateShader(type);
     glShaderSource(shader_id, 1, &shader_source, nullptr);
     glCompileShader(shader_id);
 
@@ -27,15 +26,14 @@ unsigned Gui::load_shader(GLenum type, std::string filepath)
     if (!success)
     {
         glGetShaderInfoLog(shader_id, 512, nullptr, info_log);
-        std::cout << "Compile shader file " << filepath << " error!" << std::endl;
-        std::cout << info_log << std::endl;
+        std::cout << "ERROR::Compile shader failed: " << info_log << std::endl;
         exit(-1);
     }
 
     return shader_id;
 }
 
-unsigned Gui::load_texture(float* data, int tex_w, int tex_h)
+unsigned GUI::load_texture(float* data, int w, int h)
 {
     unsigned int texture;
     glGenTextures(1, &texture);
@@ -46,19 +44,18 @@ unsigned Gui::load_texture(float* data, int tex_w, int tex_h)
     glTextureParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTextureParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    GLenum format = GL_RGBA;
+    GLenum format = GL_RGBA32F;
 
-    glTexImage2D(GL_TEXTURE_2D, 0, format, tex_w, tex_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, GL_RGBA, GL_FLOAT, data);
     glGenerateMipmap(GL_TEXTURE_2D);
 
     return texture;
 }
 
-unsigned Gui::create_program(std::string vertexPath, std::string fragmentPath)
+unsigned GUI::create_program(string vertex_path, string fragment_path)
 {
-    unsigned int vertex_shader, fragment_shader;
-    vertex_shader = load_shader(GL_VERTEX_SHADER, vertexPath);
-    fragment_shader = load_shader(GL_FRAGMENT_SHADER, fragmentPath);
+    unsigned int vertex_shader = load_shader(GL_VERTEX_SHADER, vertex_path);
+    unsigned int fragment_shader = load_shader(GL_FRAGMENT_SHADER, fragment_path);
 
     unsigned int program = glCreateProgram();
     glAttachShader(program, vertex_shader);
@@ -71,8 +68,7 @@ unsigned Gui::create_program(std::string vertexPath, std::string fragmentPath)
     if (!success)
     {
         glGetProgramInfoLog(program, 512, nullptr, info_log);
-        std::cout << "Failed to link program!" << std::endl;
-        std::cout << info_log << std::endl;
+        std::cout << "ERROR::Link program failed: " << info_log << std::endl;
         exit(-1);
     }
 
@@ -82,7 +78,7 @@ unsigned Gui::create_program(std::string vertexPath, std::string fragmentPath)
     return program;
 }
 
-unsigned Gui::create_vao(float* vertices, int size)
+unsigned GUI::create_vao(float* vertices, int size)
 {
     unsigned int vao;
     glGenVertexArrays(1, &vao);
@@ -104,18 +100,19 @@ unsigned Gui::create_vao(float* vertices, int size)
     return vao;
 }
 
-Gui::Gui(int _w, int _h, string name, shared_ptr<Camera> _c)
-    : user_data(_c)
+GUI::GUI(int _w, int _h, shared_ptr<Camera> _c, int n)
+    : user_data(_c), num_textures(n), tex_width(_w), tex_height(_h)
 {
+    // initialize glfw
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    window = glfwCreateWindow(_w, _h, name.c_str(), nullptr, nullptr);
+    window = glfwCreateWindow(_w, _h, "SRT", nullptr, nullptr);
     if (!window)
     {
-        std::cout << "Failed to create window!" << std::endl;
+        std::cout << "ERROR::Failed to create window" << std::endl;
         glfwTerminate();
         exit(-1);
     }
@@ -123,7 +120,7 @@ Gui::Gui(int _w, int _h, string name, shared_ptr<Camera> _c)
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
-        std::cout << "Failed to initialize glad!" << std::endl;
+        std::cout << "ERROR::Failed to initialize GLAD" << std::endl;
         exit(-1);
     }
 
@@ -133,6 +130,7 @@ Gui::Gui(int _w, int _h, string name, shared_ptr<Camera> _c)
         glViewport(0, 0, w, h);
     };
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
     auto cursor_pos_callback = [](GLFWwindow* window, double x, double y) {
         WindowUserData* ud = (WindowUserData*)glfwGetWindowUserPointer(window);
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
@@ -153,32 +151,66 @@ Gui::Gui(int _w, int _h, string name, shared_ptr<Camera> _c)
         else ud->first_mouse = true;
     };
     glfwSetCursorPosCallback(window, cursor_pos_callback);
-    GLFWscrollfun scroll_callback = [](GLFWwindow* window, double x, double y) {
+
+    auto scroll_callback = [](GLFWwindow* window, double x, double y) {
         WindowUserData* ud = (WindowUserData*)glfwGetWindowUserPointer(window);
         ud->camera->process_scroll_input(static_cast<float>(y));
     };
     glfwSetScrollCallback(window, scroll_callback);
-    glfwSwapInterval(1);
 
+    glfwSwapInterval(0);
+
+    // initialize imgui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImPlot::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    ImGui::StyleColorsDark();
+    ImGui::StyleColorsLight();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
-    const char* glsl_version = "#version 460";
-    ImGui_ImplOpenGL3_Init(glsl_version);
+    ImGui_ImplOpenGL3_Init("#version 460");
 
-    std::filesystem::path p(__FILE__);
-    auto shaderPath = p.parent_path();
-    auto vertex_shaderPath = shaderPath / "hello.vert";
-    auto fragment_shaderPath = shaderPath / "hello.frag";
-    program_id = create_program(vertex_shaderPath.string(), fragment_shaderPath.string());
+    // create shader
+    std::filesystem::path folder(__FILE__);
+    folder = folder.parent_path();
+    program_id = create_program((folder / "hello.vert"), (folder / "hello.frag"));
+
+    // create vao, texture
+    vaos.resize(num_textures);
+    texs.resize(num_textures);
+    cuda_texs.resize(num_textures);
+    for (int i = 0; i < num_textures; i++)
+    {
+        float tl = i / num_textures, tr = (i + 1) / num_textures;
+        float vl = tl * 2.0f - 1.0f, vr = tr * 2.0f - 1.0f;
+        float quad_vertices[] =
+        {
+            vl,  1.0f, tl, 1.0f,
+            vl, -1.0f, tl, 0.0f,
+            vr, -1.0f, tr, 0.0f,
+
+            vl,  1.0f, tl, 1.0f,
+            vr, -1.0f, tr, 0.0f,
+            vr,  1.0f, tr, 1.0f
+        };
+        int size = sizeof(quad_vertices);
+
+        vaos[i] = create_vao(quad_vertices, size);
+        texs[i] = load_texture(nullptr, tex_width, tex_height);
+        checkCudaErrors(cudaGraphicsGLRegisterImage(&cuda_texs[i], texs[i],
+            GL_TEXTURE_2D, cudaGraphicsRegisterFlagsWriteDiscard));
+    }
 }
 
-Gui::~Gui()
+GUI::~GUI()
 {
     glDeleteProgram(program_id);
+
+    for (int i = 0; i < num_textures; i++)
+    {
+        cudaGraphicsUnregisterResource(cuda_texs[i]);
+        glDeleteVertexArrays(1, &vaos[i]);
+        glDeleteTextures(1, &texs[i]);
+    }
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
@@ -189,12 +221,12 @@ Gui::~Gui()
     glfwTerminate();
 }
 
-bool Gui::should_close()
+bool GUI::should_close()
 {
     return glfwWindowShouldClose(window);
 }
 
-void Gui::process_input()
+void GUI::process_input()
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -216,132 +248,31 @@ void Gui::process_input()
     ud->last_time = static_cast<float>(glfwGetTime());
 }
 
-MaterialAdjustGui::MaterialAdjustGui(int _w, int _h, shared_ptr<Camera> _c, shared_ptr<Material> _m)
-    : Gui(_w, _h, "Material Adjust", _c), tex_width(_w), tex_height(_h), mat(_m)
-{
-    float quad_vertices[] =
-    {
-        -1.0f,  1.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f,  0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-
-        -1.0f,  1.0f,  0.0f, 1.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-         1.0f,  1.0f,  1.0f, 1.0f
-    };
-    int size = sizeof(quad_vertices);
-
-    vao_id = create_vao(quad_vertices, size);
-    tex_id = load_texture(nullptr, tex_width, tex_height);
-    checkCudaErrors(cudaGraphicsGLRegisterImage(&cuda_tex_resource, tex_id,
-        GL_TEXTURE_2D, cudaGraphicsRegisterFlagsWriteDiscard));
-}
-
-MaterialAdjustGui::~MaterialAdjustGui()
-{
-    checkCudaErrors(cudaGraphicsUnregisterResource(cuda_tex_resource));
-    glDeleteVertexArrays(1, &vao_id);
-    glDeleteTextures(1, &tex_id);
-}
-
-void MaterialAdjustGui::run(unsigned char* data)
+void GUI::begin_frame()
 {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
     ImGui::Begin("SRT");
-    ImGui::Text("Application Time %.1f s", glfwGetTime());
-    ImGui::Text("Application average %.1f FPS", ImGui::GetIO().Framerate);
-    // ImGui::DragFloat("radius", &user_data.camera->radius, 0.2f, 1.0f, 30.0f);
+    ImGui::Text("Application Time %.1f s", ImGui::GetTime());
+    ImGui::Text("FPS %.1f", ImGui::GetIO().Framerate);
+}
 
-    ImGui::ColorEdit3("color", &mat->color.x);
-    ImGui::SliderFloat("ior", &mat->params[0], 0.5f, 1.5f);
-    ImGui::SliderFloat("metallic", &mat->params[1], 0.0f, 1.0f);
-    ImGui::SliderFloat("subsurface", &mat->params[2], 0.0f, 1.0f);
-    ImGui::SliderFloat("roughness", &mat->params[3], 0.0f, 1.0f);
-    ImGui::SliderFloat("specular", &mat->params[4], 0.0f, 1.0f);
-    ImGui::SliderFloat("specularTint", &mat->params[5], 0.0f, 1.0f);
-    ImGui::SliderFloat("anisotropic", &mat->params[6], 0.0f, 1.0f);
-    ImGui::SliderFloat("sheen", &mat->params[7], 0.0f, 1.0f);
-    ImGui::SliderFloat("sheenTint", &mat->params[8], 0.0f, 1.0f);
-    ImGui::SliderFloat("clearcoat", &mat->params[9], 0.0f, 1.0f);
-    ImGui::SliderFloat("clearcoatGloss", &mat->params[10], 0.0f, 1.0f);
-    ImGui::SliderFloat("specTrans", &mat->params[11], 0.0f, 1.0f);
-
-    ImGui::End();
-
-    // ImPlot::ShowDemoWindow();
-
-    ImGui::Render();
-
-    process_input();
-
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+void GUI::write_texture(float4* data, int idx)
+{
     cudaArray* cuda_tex_array;
-    checkCudaErrors(cudaGraphicsMapResources(1, &cuda_tex_resource, 0));
+    checkCudaErrors(cudaGraphicsMapResources(1, &cuda_texs[idx]));
     checkCudaErrors(cudaGraphicsSubResourceGetMappedArray(
-        &cuda_tex_array, cuda_tex_resource, 0, 0));
-    checkCudaErrors(cudaMemcpy2DToArray(cuda_tex_array, 0, 0, data, tex_width * sizeof(uchar4),
-        tex_width * sizeof(uchar4), tex_height, cudaMemcpyDeviceToDevice));
-    checkCudaErrors(cudaGraphicsUnmapResources(1, &cuda_tex_resource, 0));
-
-    glUseProgram(program_id);
-    glBindVertexArray(vao_id);
-    glBindTexture(GL_TEXTURE_2D, tex_id);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-    glfwSwapBuffers(window);
-    glfwPollEvents();
+        &cuda_tex_array, cuda_texs[idx], 0, 0));
+    checkCudaErrors(cudaMemcpy2DToArray(cuda_tex_array, 0, 0, data, tex_width * sizeof(float4),
+        tex_width * sizeof(float4), tex_height, cudaMemcpyDeviceToDevice));
+    checkCudaErrors(cudaGraphicsUnmapResources(1, &cuda_texs[idx]));
 }
 
-InteractiveGui::InteractiveGui(int _w, int _h, shared_ptr<Camera> _c)
-    : Gui(_w, _h, "Interactive", _c), tex_width(_w), tex_height(_h)
+void GUI::end_frame()
 {
-    float quad_vertices[] =
-    {
-        -1.0f,  1.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f,  0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-
-        -1.0f,  1.0f,  0.0f, 1.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-         1.0f,  1.0f,  1.0f, 1.0f
-    };
-    int size = sizeof(quad_vertices);
-
-    vao_id = create_vao(quad_vertices, size);
-    tex_id = load_texture(nullptr, tex_width, tex_height);
-    checkCudaErrors(cudaGraphicsGLRegisterImage(&cuda_tex_resource, tex_id,
-        GL_TEXTURE_2D, cudaGraphicsRegisterFlagsWriteDiscard));
-}
-
-InteractiveGui::~InteractiveGui()
-{
-    checkCudaErrors(cudaGraphicsUnregisterResource(cuda_tex_resource));
-    glDeleteVertexArrays(1, &vao_id);
-    glDeleteTextures(1, &tex_id);
-}
-
-void InteractiveGui::run(unsigned char* data, std::fstream& file)
-{
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    ImGui::Begin("SRT");
-    ImGui::Text("Application Time %.1f s", glfwGetTime());
-    ImGui::Text("Application average %.1f FPS", ImGui::GetIO().Framerate);
-    // ImGui::DragFloat("radius", &user_data.camera->radius, 0.2f, 1.0f, 30.0f);
-    file << ImGui::GetIO().Framerate << std::endl;
-
     ImGui::End();
-
-    // ImPlot::ShowDemoWindow();
 
     ImGui::Render();
 
@@ -350,104 +281,13 @@ void InteractiveGui::run(unsigned char* data, std::fstream& file)
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    cudaArray* cuda_tex_array;
-    checkCudaErrors(cudaGraphicsMapResources(1, &cuda_tex_resource, 0));
-    checkCudaErrors(cudaGraphicsSubResourceGetMappedArray(
-        &cuda_tex_array, cuda_tex_resource, 0, 0));
-    checkCudaErrors(cudaMemcpy2DToArray(cuda_tex_array, 0, 0, data, tex_width * sizeof(uchar4),
-        tex_width * sizeof(uchar4), tex_height, cudaMemcpyDeviceToDevice));
-    checkCudaErrors(cudaGraphicsUnmapResources(1, &cuda_tex_resource, 0));
-
     glUseProgram(program_id);
-    glBindVertexArray(vao_id);
-    glBindTexture(GL_TEXTURE_2D, tex_id);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-    glfwSwapBuffers(window);
-    glfwPollEvents();
-}
-
-ComparisonGui::ComparisonGui(int _w, int _h, shared_ptr<Camera> _c)
-    : Gui(_w, _h, "Comparison", _c), tex_width(_w), tex_height(_h)
-{
-    float quad_vertices[] =
+    for (int i = 0; i < num_textures; i++)
     {
-        -1.0f,  1.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f,  0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-
-        -1.0f,  1.0f,  0.0f, 1.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-         1.0f,  1.0f,  1.0f, 1.0f
-    };
-    int size = sizeof(quad_vertices);
-
-    vao_id_1 = create_vao(quad_vertices, size / 2);
-    vao_id_2 = create_vao(quad_vertices + 12, size / 2);
-    tex_id_1 = load_texture(nullptr, tex_width, tex_height);
-    tex_id_2 = load_texture(nullptr, tex_width, tex_height);
-    checkCudaErrors(cudaGraphicsGLRegisterImage(&cuda_tex_resource_1, tex_id_1,
-        GL_TEXTURE_2D, cudaGraphicsRegisterFlagsWriteDiscard));
-    checkCudaErrors(cudaGraphicsGLRegisterImage(&cuda_tex_resource_2, tex_id_2,
-        GL_TEXTURE_2D, cudaGraphicsRegisterFlagsWriteDiscard));
-}
-
-ComparisonGui::~ComparisonGui()
-{
-    checkCudaErrors(cudaGraphicsUnregisterResource(cuda_tex_resource_1));
-    checkCudaErrors(cudaGraphicsUnregisterResource(cuda_tex_resource_2));
-    glDeleteVertexArrays(1, &vao_id_1);
-    glDeleteVertexArrays(1, &vao_id_2);
-    glDeleteTextures(1, &tex_id_1);
-    glDeleteTextures(1, &tex_id_2);
-}
-
-void ComparisonGui::run(unsigned char* data_1, unsigned char* data_2)
-{
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    ImGui::Begin("SRT");
-    ImGui::Text("Application Time %.1f s", glfwGetTime());
-    ImGui::Text("Application average %.1f FPS", ImGui::GetIO().Framerate);
-    // ImGui::DragFloat("radius", &user_data.camera->radius, 0.2f, 1.0f, 30.0f);
-
-    ImGui::End();
-
-    // ImPlot::ShowDemoWindow();
-
-    ImGui::Render();
-
-    process_input();
-
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    cudaArray* cuda_tex_array_1;
-    checkCudaErrors(cudaGraphicsMapResources(1, &cuda_tex_resource_1, 0));
-    checkCudaErrors(cudaGraphicsSubResourceGetMappedArray(
-        &cuda_tex_array_1, cuda_tex_resource_1, 0, 0));
-    checkCudaErrors(cudaMemcpy2DToArray(cuda_tex_array_1, 0, 0, data_1, tex_width * sizeof(uchar4),
-        tex_width * sizeof(uchar4), tex_height, cudaMemcpyDeviceToDevice));
-    checkCudaErrors(cudaGraphicsUnmapResources(1, &cuda_tex_resource_1, 0));
-    cudaArray* cuda_tex_array_2;
-    checkCudaErrors(cudaGraphicsMapResources(1, &cuda_tex_resource_2, 0));
-    checkCudaErrors(cudaGraphicsSubResourceGetMappedArray(
-        &cuda_tex_array_2, cuda_tex_resource_2, 0, 0));
-    checkCudaErrors(cudaMemcpy2DToArray(cuda_tex_array_2, 0, 0, data_2, tex_width * sizeof(uchar4),
-        tex_width * sizeof(uchar4), tex_height, cudaMemcpyDeviceToDevice));
-    checkCudaErrors(cudaGraphicsUnmapResources(1, &cuda_tex_resource_2, 0));
-
-    glUseProgram(program_id);
-    glBindVertexArray(vao_id_1);
-    glBindTexture(GL_TEXTURE_2D, tex_id_1);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    glBindVertexArray(vao_id_2);
-    glBindTexture(GL_TEXTURE_2D, tex_id_2);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+        glBindVertexArray(vaos[i]);
+        glBindTexture(GL_TEXTURE_2D, texs[i]);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+    }
 
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 

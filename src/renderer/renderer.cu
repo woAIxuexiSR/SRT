@@ -26,4 +26,19 @@ void Renderer::run()
     // film->save_ldr("hhh.png");
     film->save_ldr("hhh2.jpg");
     // film->save_hdr("hhh.exr");
+
+    // shared_ptr<GUI> gui = make_shared<GUI>(width, height, scene->camera);
+    // while(!gui->should_close())
+    // {
+    //     gui->begin_frame();
+
+    //     for(auto process : processes)
+    //     {
+    //         process->render(film);
+    //         process->render_ui();
+    //     }
+
+    //     gui->write_texture(film->get_pixels());
+    //     gui->end_frame();
+    // }
 }

@@ -8,6 +8,8 @@
 #include "postprocess/tonemapping.h"
 #include "postprocess/denoise.h"
 
+#include "gui.h"
+
 class Renderer
 {
 private:
