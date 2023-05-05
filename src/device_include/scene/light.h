@@ -20,40 +20,41 @@ class Light
 public:
     int num;
     float3* vertices;
-    float3* normals;
     uint3* indices;
-    float* accum_area;  // accumulated area
-    float3* emission;
+    float3* normals;
+    float* areas;
+    float3* emissions;
     float total_area;
 
-    __device__ __host__ Light() : num(0), vertices(nullptr), normals(nullptr), indices(nullptr), accum_area(nullptr), emission(nullptr) {}
+    __device__ __host__ Light() : num(0), vertices(nullptr), normals(nullptr), indices(nullptr), areas(nullptr), emissions(nullptr) {}
 
-    __device__ __host__ void set(int _n, float3* _v, float3* _vn, uint3* _i, float* _a, float3* _e, float _ta)
+    __device__ __host__ void set(int _n, float3* _v, uint3* _i, float3* _vn, float* _a, float3* _e, float _ta)
     {
         num = _n;
         vertices = _v;
-        normals = _vn;
         indices = _i;
-        accum_area = _a;
-        emission = _e;
+        normals = _vn;
+        areas = _a;
+        emissions = _e;
         total_area = _ta;
     }
 
     __device__ LightSample sample(float2 rnd)
     {
         float s = rnd.x * total_area;
+        float sum = 0.0f;
         for (int i = 0; i < num; i++)
         {
-            if(s <= accum_area[i] || i == num - 1)
+            if(s <= sum + areas[i] || i == num - 1)
             {
-                rnd.x = clamp((i == 0 ? s / accum_area[0] : (s - accum_area[i - 1]) / (accum_area[i] - accum_area[i - 1])), 0.0f, 1.0f);
+                rnd.x = clamp((s - sum) / areas[i], 0.0f, 1.0f);
                 float2 p = uniform_sample_triangle(rnd);
                 uint3& index = indices[i];
                 float3 pos = vertices[index.x] * (1.0f - p.x - p.y) + vertices[index.y] * p.x + vertices[index.z] * p.y;
                 float3 normal = normals[index.x] * (1.0f - p.x - p.y) + normals[index.y] * p.x + normals[index.z] * p.y;
                 if(length(normals[index.x]) < 0.1f)
                     normal = cross(vertices[index.y] - vertices[index.x], vertices[index.z] - vertices[index.x]);
-                return LightSample(pos, normalize(normal), emission[i], sample_pdf());
+                return LightSample(pos, normalize(normal), emissions[i], sample_pdf());
             }
         }
         return LightSample();

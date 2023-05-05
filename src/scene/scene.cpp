@@ -1,321 +1,218 @@
 #include "scene.h"
 
-TriangleMesh::TriangleMesh(const string& type, const unordered_map<string, string>& params, SquareMatrix<4> transform)
+void set_material_property(shared_ptr<Material> material, const string& name, float value)
 {
-    if (type == "plymesh")
+    if (name == "ior")
+        material->params[0] = value;
+    else if (name == "metallic")
+        material->params[1] = value;
+    else if (name == "subsurface")
+        material->params[2] = value;
+    else if (name == "roughness")
+        material->params[3] = value;
+    else if (name == "specular")
+        material->params[4] = value;
+    else if (name == "specularTint")
+        material->params[5] = value;
+    else if (name == "anisotropic")
+        material->params[6] = value;
+    else if (name == "sheen")
+        material->params[7] = value;
+    else if (name == "sheenTint")
+        material->params[8] = value;
+    else if (name == "clearcoat")
+        material->params[9] = value;
+    else if (name == "clearcoatGloss")
+        material->params[10] = value;
+    else if (name == "specTrans")
+        material->params[11] = value;
+    else
     {
-        auto it = params.find("string filename");
-        if (it == params.end())
-        {
-            cout << "plymesh: missing filename" << endl;
-            exit(-1);
-        }
-        string plyPath = params.at("folderpath") + "/" + dequote(it->second);
-        create_from_ply(plyPath);
-    }
-    else if (type == "trianglemesh")
-        create_from_triangles(params);
-
-    Transform T(Transpose(transform));
-    for (int i = 0; i < vertices.size(); i++)
-        vertices[i] = T.apply_point(vertices[i]);
-    // for(int i = 0; i < normals.size(); i++)
-        // normals[i] = transform * normals[i];
-}
-
-void TriangleMesh::create_from_ply(const string& plyPath)
-{
-    Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(plyPath, aiProcess_FlipUVs);
-
-    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
-    {
-        cout << "ERROR::ASSIMP::" << importer.GetErrorString() << endl;
-        exit(-1);
-    }
-
-    assert(scene->mNumMeshes == 1);
-
-    aiMesh* mesh = scene->mMeshes[0];
-    for (int i = 0; i < mesh->mNumVertices; i++)
-    {
-        float3 vertex = make_float3(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
-        vertices.push_back(vertex);
-
-        if (mesh->HasNormals())
-        {
-            float3 normal = make_float3(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
-            normals.push_back(normal);
-        }
-
-        if (mesh->mTextureCoords[0])
-        {
-            float2 texcoord = make_float2(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);
-            texcoords.push_back(texcoord);
-        }
-    }
-    for (int i = 0; i < mesh->mNumFaces; i++)
-    {
-        aiFace face = mesh->mFaces[i];
-        int num_vertex = face.mNumIndices;
-        if (num_vertex < 3)
-            continue;
-        else
-        {
-            for (int j = 1; j < num_vertex - 1; j++)
-            {
-                uint3 index = make_uint3(face.mIndices[0], face.mIndices[j], face.mIndices[j + 1]);
-                indices.push_back(index);
-            }
-        }
+        cout << "ERROR::UNKNOWN_MATERIAL_PROPERTY::" << name << endl;
+        return;
     }
 }
 
-void TriangleMesh::create_from_triangles(const unordered_map<string, string>& params)
+int Scene::add_mesh(shared_ptr<TriangleMesh> mesh, int material_id)
 {
-    auto it = params.find("point3 P");
-    if (it == params.end())
-    {
-        cout << "trianglemesh: missing points" << endl;
-        exit(1);
-    }
-    vector<float> P = parse_to_vector<float>(it->second);
-    vertices.resize(P.size() / 3);
-    memcpy(vertices.data(), P.data(), P.size() * sizeof(float));
-
-    it = params.find("integer indices");
-    if (it == params.end())
-    {
-        cout << "trianglemesh: missing indices" << endl;
-        exit(1);
-    }
-    vector<int> I = parse_to_vector<int>(it->second);
-    indices.resize(I.size() / 3);
-    memcpy(indices.data(), I.data(), I.size() * sizeof(int));
-
-    it = params.find("normal N");
-    if (it != params.end())
-    {
-        vector<float> N = parse_to_vector<float>(it->second);
-        normals.resize(N.size() / 3);
-        memcpy(normals.data(), N.data(), N.size() * sizeof(float));
-    }
-
-    it = params.find("point2 uv");
-    if (it != params.end())
-    {
-        vector<float> UV = parse_to_vector<float>(it->second);
-        texcoords.resize(UV.size() / 2);
-        memcpy(texcoords.data(), UV.data(), UV.size() * sizeof(float));
-    }
-}
-
-void Texture::load_from_file(const string& filename)
-{
-    string suffix = filename.substr(filename.find_last_of(".") + 1);
-
-    uint2 res;
-    int compontents;
-    unsigned char* image = stbi_load(filename.c_str(), (int*)&res.x, (int*)&res.y, &compontents, STBI_rgb_alpha);
-
-    if (!image)
-    {
-        std::cout << "Failed to load texture file " << filename << std::endl;
-        exit(-1);
-    }
-
-    pixels = (unsigned*)image;
-    resolution = res;
-}
-
-
-void Scene::add_mesh(const string& type, const unordered_map<string, string>& params, int material_id, SquareMatrix<4> transform)
-{
-    shared_ptr<TriangleMesh> mesh = make_shared<TriangleMesh>(type, params, transform);
     mesh->material_id = material_id;
-    if (mat_to_tex.find(material_id) != mat_to_tex.end())
-        mesh->texture_id = mat_to_tex[material_id];
+    if (material_to_texture.find(material_id) != material_to_texture.end())
+        mesh->texture_id = material_to_texture[material_id];
+
+    if (meshes.empty() && animated_meshes.empty())
+        aabb = mesh->aabb;
+    else
+        aabb.expand(mesh->aabb);
+
+    int id = meshes.size();
     meshes.push_back(mesh);
+    return id;
 }
 
-int Scene::add_texture(const string& name, const unordered_map<string, string>& params)
+int Scene::add_animated_mesh(shared_ptr<AnimatedTriangleMesh> mesh, int material_id)
 {
-    shared_ptr<Texture> tex = make_shared<Texture>();
-    int texture_id = textures.size();
-    auto it = params.find("string filename");
-    if (it == params.end())
-    {
-        cout << "texture: missing filename" << endl;
-        exit(-1);
-    }
-    string texFile = params.at("folderpath") + "/" + dequote(it->second);
-    tex->load_from_file(texFile);
-    named_textures[name] = texture_id;
-    textures.push_back(tex);
-    return texture_id;
+    mesh->material_id = material_id;
+    if (material_to_texture.find(material_id) != material_to_texture.end())
+        mesh->texture_id = material_to_texture[material_id];
+    
+    if(meshes.empty() && animated_meshes.empty())
+        aabb = mesh->aabb;
+    else
+        aabb.expand(mesh->aabb);
+    
+    int id = animated_meshes.size();
+    animated_meshes.push_back(mesh);
+    return id;
 }
 
-int Scene::add_named_material(const string& name, const unordered_map<string, string>& params)
+int Scene::add_material(shared_ptr<Material> material, string name, int texture_id)
 {
-    auto it = params.find("string type");
-    if (it == params.end())
-    {
-        cout << "material: missing type" << endl;
-        exit(-1);
-    }
-    int material_id = add_material(dequote(it->second), params);
-    named_materials[name] = material_id;
-    return material_id;
+    int id = materials.size();
+    name = (name == "") ? "material_" + std::to_string(id) : name;
+    materials.push_back(material);
+    material_names.push_back(name);
+    if (texture_id != -1)
+        material_to_texture[id] = texture_id;
+    return id;
 }
 
-int Scene::add_material(const string& type, const unordered_map<string, string>& params)
+int Scene::add_textures(shared_ptr<Texture> texture, string name)
 {
-    shared_ptr<Material> mat = make_shared<Material>();
-    int material_id = materials.size();
-    if (type == "diffuse")
-    {
-        mat->type = MaterialType::Diffuse;
-        auto it = params.find("rgb reflectance");
-        if (it != params.end())
-        {
-            vector<float> color = parse_to_vector<float>(it->second);
-            mat->color = make_float3(color[0], color[1], color[2]);
-        }
-
-        it = params.find("texture reflectance");
-        if (it != params.end())
-        {
-            string textureName = dequote(it->second);
-            if (named_textures.find(textureName) == named_textures.end())
-            {
-                cout << "texture " << textureName << " not found" << endl;
-                exit(-1);
-            }
-            mat_to_tex[material_id] = named_textures[textureName];
-        }
-    }
-    else if (type == "coateddiffuse")
-    {
-        
-    }
-
-    materials.push_back(mat);
-    return material_id;
+    int id = textures.size();
+    name = (name == "") ? "texture_" + std::to_string(id) : name;
+    textures.push_back(texture);
+    texture_names.push_back(name);
+    return id;
 }
 
-int Scene::add_light_material(const string& type, const unordered_map<string, string>& params)
+void convert_material(aiMaterial* amat, shared_ptr<Material> material)
 {
-    // type == "diffuse"
-    shared_ptr<Material> mat = make_shared<Material>();
-    int material_id = materials.size();
-    mat->type = MaterialType::Diffuse;
-    auto it = params.find("rgb L");
-    if (it != params.end())
-    {
-        vector<float> emission = parse_to_vector<float>(it->second);
-        mat->emission = make_float3(emission[0], emission[1], emission[2]);
-    }
-    materials.push_back(mat);
-    return material_id;
-}
+    aiColor3D diffuse{ 0,0,0 };
+    aiColor3D emission{ 0,0,0 };
+    float emissiveStrength = 1.0f;
+    float ior = 1.5f;
+    float metallic = 0.0f;
+    // float subsurface = 0.0f;
+    float roughness = 0.5f;
+    float specular = 0.5f;
+    //float specularTint = 0.0f;
+    //float anisotropic = 0.0f;
+    float sheen = 0.0f;
+    float sheenTint = 0.0f;
+    float clearcoat = 0.0f;
+    float clearcoatGloss = 0.0f;
+    float specTrans = 0.0f;
 
+    amat->Get(AI_MATKEY_COLOR_DIFFUSE, diffuse);
+    amat->Get(AI_MATKEY_COLOR_EMISSIVE, emission);
+    amat->Get(AI_MATKEY_EMISSIVE_INTENSITY, emissiveStrength);
+    amat->Get(AI_MATKEY_REFRACTI, ior);
+    amat->Get(AI_MATKEY_METALLIC_FACTOR, metallic);
+    amat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness);
+    amat->Get(AI_MATKEY_SPECULAR_FACTOR, specular);
+    amat->Get(AI_MATKEY_SHEEN_COLOR_FACTOR, sheen);
+    amat->Get(AI_MATKEY_SHEEN_ROUGHNESS_FACTOR, sheenTint);
+    amat->Get(AI_MATKEY_CLEARCOAT_FACTOR, clearcoat);
+    amat->Get(AI_MATKEY_CLEARCOAT_ROUGHNESS_FACTOR, clearcoatGloss);
+    amat->Get(AI_MATKEY_TRANSMISSION_FACTOR, specTrans);
 
-int Scene::get_material_id(const string& name)
-{
-    if (named_materials.find(name) == named_materials.end())
-    {
-        cout << "material " << name << " not found" << endl;
-        exit(-1);
-    }
-    return named_materials[name];
+    material->type = MaterialType::Disney;
+    material->color = make_float3(diffuse.r, diffuse.g, diffuse.b);
+    material->emission = make_float3(emission.r, emission.g, emission.b) * emissiveStrength;
+    set_material_property(material, "ior", ior);
+    set_material_property(material, "metallic", metallic);
+    set_material_property(material, "roughness", roughness);
+    set_material_property(material, "specular", specular);
+    set_material_property(material, "sheen", sheen);
+    set_material_property(material, "sheenTint", sheenTint);
+    set_material_property(material, "clearcoat", clearcoat);
+    set_material_property(material, "clearcoatGloss", clearcoatGloss);
+    set_material_property(material, "specTrans", specTrans);
 }
 
 void Scene::load_from_model(const string& filename)
 {
     Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_FlipUVs);
+    const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs);
 
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
     {
         cout << "ERROR::ASSIMP::" << importer.GetErrorString() << endl;
-        exit(-1);
+        return;
     }
 
     std::filesystem::path folder = std::filesystem::path(filename).parent_path();
-
     for (int i = 0; i < scene->mNumMeshes; i++)
     {
         aiMesh* amesh = scene->mMeshes[i];
 
-        shared_ptr<TriangleMesh> mesh = make_shared<TriangleMesh>();
+        vector<float3> vertices, normals;
+        vector<uint3> indices;
+        vector<float2> texcoords;
         for (int j = 0; j < amesh->mNumVertices; j++)
         {
             float3 vertex = make_float3(amesh->mVertices[j].x, amesh->mVertices[j].y, amesh->mVertices[j].z);
-            mesh->vertices.push_back(vertex);
+            vertices.push_back(vertex);
 
             if (amesh->HasNormals())
             {
                 float3 normal = make_float3(amesh->mNormals[j].x, amesh->mNormals[j].y, amesh->mNormals[j].z);
-                mesh->normals.push_back(normal);
+                normals.push_back(normal);
             }
 
-            if (amesh->mTextureCoords[0])
+            if (amesh->HasTextureCoords(0))
             {
                 float2 texcoord = make_float2(amesh->mTextureCoords[0][j].x, amesh->mTextureCoords[0][j].y);
-                mesh->texcoords.push_back(texcoord);
+                texcoords.push_back(texcoord);
             }
         }
         for (int j = 0; j < amesh->mNumFaces; j++)
         {
-            aiFace face = amesh->mFaces[j];
+            aiFace& face = amesh->mFaces[j];
             uint3 index = make_uint3(face.mIndices[0], face.mIndices[1], face.mIndices[2]);
-            mesh->indices.push_back(index);
+            indices.push_back(index);
         }
 
-        aiMaterial* amaterial = scene->mMaterials[amesh->mMaterialIndex];
+        // load mesh
+        shared_ptr<TriangleMesh> mesh = make_shared<TriangleMesh>();
+        mesh->load_from_triangles(vertices, indices, normals, texcoords);
+
+        // load material
+        aiMaterial* amat = scene->mMaterials[amesh->mMaterialIndex];
         shared_ptr<Material> material = make_shared<Material>();
+        convert_material(amat, material);
 
-        aiColor3D emissive, diffuse, specular;
-        amaterial->Get(AI_MATKEY_COLOR_EMISSIVE, emissive);
-        amaterial->Get(AI_MATKEY_COLOR_DIFFUSE, diffuse);
-        amaterial->Get(AI_MATKEY_COLOR_SPECULAR, specular);
-        if (!emissive.IsBlack())
+        // load texture
+        int texture_id = -1;
+        aiString texname;
+        if (amat->GetTextureCount(aiTextureType_DIFFUSE) > 0
+            && amat->GetTexture(aiTextureType_DIFFUSE, 0, &texname) == AI_SUCCESS)
         {
-            material->type = MaterialType::Diffuse;
-            material->emission = make_float3(emissive.r, emissive.g, emissive.b);
-            material->color = make_float3(diffuse.r, diffuse.g, diffuse.b);
+            for (int j = 0; j < texture_names.size(); j++)
+                if (std::strcmp(texture_names[j].c_str(), texname.C_Str()) == 0)
+                {
+                    texture_id = j;
+                    break;
+                }
+            if (texture_id == -1)
+            {
+                shared_ptr<Texture> texture = make_shared<Texture>();
+                texture->load_from_file(folder / texname.C_Str());
+                texture_id = add_textures(texture, texname.C_Str());
+            }
         }
-        else if(i == 5)
-        {
-            // material->type = MaterialType::Dielectric;
-            // material->color = make_float3(2.0f);
-            material->type = MaterialType::Disney;
-            material->color = make_float3(0.099, 0.24, 0.134);
-            material->params[1] = 0.5f;
-            material->params[2] = 0.5f;
-            material->params[3] = 0.5f;
-            material->params[9] = 0.5f;
-            material->params[10] = 1.0f;
-            // material->params[11] = 0.5f;
-            // material->color = make_float3(2.0f);
-            // material->params[3] = 0.001f;
-            // material->params[11] = 1.0f;
-        }
+
+        // add all
+        aiString matname;
+        int material_id = -1;
+        if (amat->Get(AI_MATKEY_NAME, matname) == AI_SUCCESS)
+            material_id = add_material(material, matname.C_Str(), texture_id);
         else
-        {
-            material->type = MaterialType::Diffuse;
-            material->color = make_float3(diffuse.r, diffuse.g, diffuse.b);
-            // material->type = MaterialType::Disney;
-            // material->color = make_float3(diffuse.r, diffuse.g, diffuse.b);
-            // material->params[0] = 0.8f;
-            // material->params[2] = 0.3f;
-            // material->params[8] = 1.0f;
-        }
-
-        int material_id = materials.size();
-        materials.push_back(material);
-        mesh->material_id = material_id;
-
-        meshes.push_back(mesh);
+            material_id = add_material(material, "", texture_id);
+        add_mesh(mesh, material_id);
     }
+}
+
+void Scene::render_ui()
+{
 }

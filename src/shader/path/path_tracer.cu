@@ -1,14 +1,14 @@
 #include <optix_device.h>
 #include <device_launch_parameters.h>
 
-#include "launch_params/launch_params.h"
 #include "helper_optix.h"
+#include "my_params.h"
 #include "my_math.h"
 
-extern "C" __constant__ LaunchParams<int> params;
+extern "C" __constant__ PathTracerParams params;
 
 template<class T>
-static __forceinline__ __device__ T* getPRD()
+__device__ inline T* getPRD()
 {
     const unsigned u0 = optixGetPayload_0();
     const unsigned u1 = optixGetPayload_1();
@@ -60,10 +60,6 @@ extern "C" __global__ void __closesthit__shadow()
     prd = 0;
 }
 
-extern "C" __global__ void __anyhit__radiance() {}
-
-extern "C" __global__ void __anyhit__shadow() {}
-
 extern "C" __global__ void __miss__radiance()
 {
     HitInfo& prd = *(HitInfo*)getPRD<HitInfo>();
@@ -79,17 +75,19 @@ extern "C" __global__ void __miss__shadow()
 extern "C" __global__ void __raygen__()
 {
     const uint3 launch_idx = optixGetLaunchIndex();
-    const int ix = launch_idx.x, iy = launch_idx.y;
+    const int idx = launch_idx.x;
 
-    RandomGenerator rng(params.frame * params.height + iy, ix);
+    const int ix = idx % params.width, iy = idx / params.width;
+
+    RandomGenerator rng(params.seed + idx, 0);
     Camera& camera = params.camera;
-    Light& light = params.light;
+    Light& light = params.extra.light;
 
     HitInfo info; int visible;
     thrust::pair<unsigned, unsigned> u = pack_pointer(&info), v = pack_pointer(&visible);
 
     float3 result = make_float3(0.0f);
-    for (int i = 0; i < params.spp; i++)
+    for (int i = 0; i < params.extra.spp; i++)
     {
         float xx = (ix + rng.random_float()) / params.width;
         float yy = (iy + rng.random_float()) / params.height;
@@ -99,7 +97,7 @@ extern "C" __global__ void __raygen__()
         bool specular = true;
         float scatter_pdf = 1.0f;
         float cos_theta = 1.0f;
-        for (int depth = 0; depth < MAX_DEPTH; depth++)
+        for (int depth = 0; depth < params.extra.max_depth; depth++)
         {
             optixTrace(params.traversable, ray.pos, ray.dir, 1e-3f, 1e16f, 0.0f,
                 OptixVisibilityMask(255), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
@@ -108,7 +106,7 @@ extern "C" __global__ void __raygen__()
 
             if (!info.hit)
             {
-                L += beta * params.background;
+                L += beta * params.extra.background;
                 break;
             }
 
@@ -173,9 +171,8 @@ extern "C" __global__ void __raygen__()
                 beta /= p;
             }
         }
-        result += L / params.spp;
+        result += L / params.extra.spp;
     }
 
-    int idx = iy * params.width + ix;
-    params.buffer[idx] = make_float4(result, 1.0f);
+    params.pixels[idx] = make_float4(result, 1.0f);
 }

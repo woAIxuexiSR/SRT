@@ -6,23 +6,6 @@
 #include <functional>
 
 
-template<class T>
-inline T parse_value(const string& value)
-{
-    std::stringstream ss(value);
-    T result;
-    ss >> result;
-    return result;
-}
-
-template<class T>
-inline string to_str(const T& value)
-{
-    std::stringstream ss;
-    ss << value;
-    return ss.str();
-}
-
 class short_circuit_option
 {
 public:

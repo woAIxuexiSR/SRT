@@ -24,6 +24,16 @@ enum
     RAY_TYPE_COUNT
 };
 
+// module program group
+class ModuleProgramGroup
+{
+public:
+    OptixProgramGroup raygenPG;
+    OptixProgramGroup missPGs[2];
+    OptixProgramGroup hitgroupPGs[2];
+};
+
+// sbt record data
 template<class T>
 struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) SBTRecord
 {
@@ -31,14 +41,8 @@ struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) SBTRecord
     T data;
 };
 
-struct RaygenData
-{
-
-};
-struct MissData
-{
-
-};
+struct RaygenData {};
+struct MissData {};
 struct HitgroupData
 {
     float3* vertex;

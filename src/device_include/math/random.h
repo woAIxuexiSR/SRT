@@ -24,23 +24,23 @@ public:
     }
 
     // [0, 1)
-    __device__ inline float random_float()
+    __device__ float random_float()
     {
         return 1 - curand_uniform(&state);
     }
 
-    __device__ inline float2 random_float2()
+    __device__ float2 random_float2()
     {
         return make_float2(random_float(), random_float());
     }
 
-    __device__ inline float3 random_float3()
+    __device__ float3 random_float3()
     {
         return make_float3(random_float(), random_float(), random_float());
     }
 
     // [min, max)
-    __device__ inline int random_int(int min, int max)
+    __device__ int random_int(int min, int max)
     {
         return min + curand(&state) % (max - min);
     }
@@ -52,4 +52,9 @@ __host__ inline float random_float()
     static std::default_random_engine g(0);
     static std::uniform_real_distribution<float> d(0, 1);
     return d(g);
+}
+
+__host__ inline int random_int(int min, int max)
+{
+    return min + random_float() * (max - min);
 }

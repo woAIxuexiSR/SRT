@@ -30,19 +30,18 @@ public:
         return thrust::make_pair(x, y);
     }
 
-    __host__ __device__ SquareMatrix<4> get_transform() const
+    __host__ __device__ Transform get_transform() const
     {
-        return SquareMatrix<4>(
+        return Transform(SquareMatrix<4>(
             right.x, right.y, right.z, -pos.x,
             up.x, up.y, up.z, -pos.y,
             front.x, front.y, front.z, -pos.z,
-            0.0f, 0.0f, 0.0f, 1.0f);
+            0.0f, 0.0f, 0.0f, 1.0f));
     }
 
-    __host__ __device__ SquareMatrix<4> get_inv_transform() const
+    __host__ __device__ Transform get_inv_transform() const
     {
-        auto m = Inverse(get_transform());
-        return m.value();
+        return Inverse(get_transform());
     }
 
     // host function
@@ -93,12 +92,12 @@ public:
 
     void process_mouse_input(float xoffset, float yoffset)
     {
-        SquareMatrix<4> m = get_transform();
+        Transform m = get_transform();
         m = m * RotateX(radians(-yoffset)) * RotateY(radians(xoffset));
 
-        front = make_float3(m * make_float4(0.0f, 0.0f, 1.0f, 0.0f));
-        up = make_float3(m * make_float4(0.0f, 1.0f, 0.0f, 0.0f));
-        right = make_float3(m * make_float4(1.0f, 0.0f, 0.0f, 0.0f));
+        front = m.apply_dir(make_float3(0.0f, 0.0f, 1.0f));
+        up = m.apply_dir(make_float3(0.0f, 1.0f, 0.0f));
+        right = m.apply_dir(make_float3(1.0f, 0.0f, 0.0f));
     }
 
     void process_scroll_input(float yoffset)

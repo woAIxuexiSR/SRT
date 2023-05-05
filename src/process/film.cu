@@ -2,73 +2,58 @@
 
 __global__ void f_to_uchar_k(int n_elements, float4* __restrict__ src, uchar4* __restrict__ dst)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= n_elements) return;
-    float4 clamped = clamp(src[i], 0.0f, 1.0f);
-    float w = 1.0f / 2.2f;
-    float4 hdr = make_float4(powf(clamped.x, w), powf(clamped.y, w), powf(clamped.z, w), powf(clamped.w, w));
-    float4 v = hdr * 255.f;
-    dst[i] = make_uchar4(v.x, v.y, v.z, v.w);
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (idx >= n_elements) return;
+    float4 f = clamp(src[idx], 0.0f, 1.0f) * 255.0f;
+    dst[idx] = make_uchar4(f.x, f.y, f.z, f.w);
 }
 
 __global__ void flip_f_vertical_k(int n_elements, int width, int height, float4* __restrict__ src, float4* __restrict__ dst)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= n_elements) return;
-    int x = i % width, y = i / width;
-    dst[i] = src[(height - y - 1) * width + x];
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (idx >= n_elements) return;
+    int x = idx % width, y = idx / width;
+    dst[idx] = src[(height - y - 1) * width + x];
 }
 
-void Film::resize(int w, int h)
+void Film::save_ldr(const string& filename) const
 {
-    width = w, height = h;
-    pixels_f.resize(width * height);
-    pixels_u.resize(width * height);
-}
-
-void Film::memset_f0()
-{
-    pixels_f.memset(0);
-}
-
-void Film::f_to_uchar()
-{
-    int pixel_num = width * height;
-    tcnn::linear_kernel(f_to_uchar_k, 0, 0, pixel_num, pixels_f.data(), pixels_u.data());
+    GPUMemory<uchar4> u(width * height);
+    tcnn::linear_kernel(f_to_uchar_k, 0, 0, width * height, pixels.data(), u.data());
     checkCudaErrors(cudaDeviceSynchronize());
-}
 
-void Film::save_png(const string& filename) const
-{
-    vector<uchar4> pixels_cpu(width * height);
-    pixels_u.copy_to_host(pixels_cpu);
+    vector<uchar4> h_u(width * height);
+    u.copy_to_host(h_u);
 
     stbi_flip_vertically_on_write(true);
-    int ret = stbi_write_png(filename.c_str(), width, height, 4, (void*)pixels_cpu.data(), 0);
-    if (ret == 0)
-        cout << "Failed to save image: " << filename << endl;
+    string ext = filename.substr(filename.find_last_of(".") + 1);
+    int ret = 0;
+    if(ext == "png")
+        ret = stbi_write_png(filename.c_str(), width, height, 4, (void*)h_u.data(), 0);
+    else if(ext == "jpg")
+        ret = stbi_write_jpg(filename.c_str(), width, height, 4, (void*)h_u.data(), 100);
+    else
+    {
+        cout << "ERROR::Unsupported image format: " << ext << endl;
+        return;
+    }
+
+    if(ret == 0)
+        cout << "ERROR::Failed to save image: " << filename << endl;
 }
 
-void Film::save_jpg(const string& filename) const
+void Film::save_hdr(const string& filename) const
 {
-    vector<uchar4> pixels_cpu(width * height);
-    pixels_u.copy_to_host(pixels_cpu);
+    string ext = filename.substr(filename.find_last_of(".") + 1);
+    assert(ext == "exr");
 
-    stbi_flip_vertically_on_write(true);
-    int ret = stbi_write_jpg(filename.c_str(), width, height, 4, (void*)pixels_cpu.data(), 100);
-    if (ret == 0)
-        cout << "Failed to save image: " << filename << endl;
-}
-
-void Film::save_exr(const string& filename) const
-{
     EXRHeader header;
     InitEXRHeader(&header);
     EXRImage image;
     InitEXRImage(&image);
 
     GPUMemory<float4> flipped(width * height);
-    tcnn::linear_kernel(flip_f_vertical_k, 0, 0, width * height, width, height, pixels_f.data(), flipped.data());
+    tcnn::linear_kernel(flip_f_vertical_k, 0, 0, width * height, width, height, pixels.data(), flipped.data());
     vector<float4> pixels_cpu(width * height);
     flipped.copy_to_host(pixels_cpu);
 

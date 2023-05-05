@@ -157,26 +157,6 @@ __host__ __device__ inline float smithG_GGX(float n_v, float alphaG)
     return (2.0f * n_v) / (n_v + sqrt(a + b - a * b));
 }
 
-__host__ __device__ inline float3 sample_GGX_VNDF(float3 V, float roughness, float2 sample)
-{
-    // to be checked
-    float3 Vh = normalize(make_float3(roughness * V.x, roughness * V.y, V.z));
-
-    float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
-    float3 T1 = lensq > 0.0f ? make_float3(-Vh.y, Vh.x, 0.0f) * rsqrtf(lensq) : make_float3(1.0f, 0.0f, 0.0f);
-    float3 T2 = cross(Vh, T1);
-
-    float r = sqrt(sample.x);
-    float phi = 2.0f * M_PI * sample.y;
-    float t1 = r * cos(phi);
-    float t2 = r * sin(phi);
-    float s = 0.5f * (1.0f + Vh.z);
-    t2 = (1.0f - s) * sqrt(1.0f - t1 * t1) + s * t2;
-
-    float3 Nh = t1 * T1 + t2 * T2 + sqrt(max(0.0f, 1.0f - t1 * t1 - t2 * t2)) * Vh;
-    return normalize(make_float3(roughness * Nh.x, roughness * Nh.y, max(0.0f, Nh.z)));
-}
-
 __host__ __device__ inline float3 sample_GTR1(float a, float2 sample)
 {
     if (a >= 1.0f) return cosine_sample_hemisphere(sample);
