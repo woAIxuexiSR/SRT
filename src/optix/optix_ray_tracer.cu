@@ -319,12 +319,16 @@ void OptixRayTracer::create_textures()
         cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<uchar4>();
         int width = texture.resolution.x;
         int height = texture.resolution.y;
-        int num_channels = 4;
-        int pitch = width * num_channels * sizeof(unsigned char);
+        int pitch = width * sizeof(uchar4);
+        if (texture.format == Texture::Format::Float)
+        {
+            channel_desc = cudaCreateChannelDesc<float4>();
+            pitch = width * sizeof(float4);
+        }
 
         cudaArray_t& pixel_array = texture_arrays[i];
         checkCudaErrors(cudaMallocArray(&pixel_array, &channel_desc, width, height));
-        checkCudaErrors(cudaMemcpy2DToArray(pixel_array, 0, 0, texture.pixels.data(), pitch, pitch, height, cudaMemcpyHostToDevice));
+        checkCudaErrors(cudaMemcpy2DToArray(pixel_array, 0, 0, texture.get_pixels(), pitch, pitch, height, cudaMemcpyHostToDevice));
 
         cudaResourceDesc res_desc = {};
         res_desc.resType = cudaResourceTypeArray;
@@ -335,6 +339,8 @@ void OptixRayTracer::create_textures()
         tex_desc.addressMode[1] = cudaAddressModeWrap;
         tex_desc.filterMode = cudaFilterModeLinear;
         tex_desc.readMode = cudaReadModeNormalizedFloat;
+        if (texture.format == Texture::Format::Float)
+            tex_desc.readMode = cudaReadModeElementType;
         tex_desc.normalizedCoords = 1;
         tex_desc.maxAnisotropy = 1;
         tex_desc.maxMipmapLevelClamp = 99;
@@ -351,25 +357,50 @@ void OptixRayTracer::create_environment_map()
 {
     if (scene->environment_map.empty())
         return;
-    assert(scene->environment_map.size() == 6);
+    int num = scene->environment_map.size();
+    assert(num == 1 || num == 6);
 
     int width = scene->environment_map[0]->resolution.x;
-    int channel = 6;
+    int height = scene->environment_map[0]->resolution.y;
 
-    cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<uchar4>();
-    cudaExtent extent = make_cudaExtent(width, width, channel);
-    checkCudaErrors(cudaMalloc3DArray(&environment_map_array, &channel_desc, extent, cudaArrayCubemap));
+    Texture::Format format = scene->environment_map[0]->format;
+    if (num == 1)
+    {
+        cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<uchar4>();
+        int pitch = width * sizeof(uchar4);
+        if (format == Texture::Format::Float)
+        {
+            channel_desc = cudaCreateChannelDesc<float4>();
+            pitch = width * sizeof(float4);
+        }
+        checkCudaErrors(cudaMallocArray(&environment_map_array, &channel_desc, width, height));
+        checkCudaErrors(cudaMemcpy2DToArray(environment_map_array, 0, 0, scene->environment_map[0]->get_pixels(), pitch, pitch, height, cudaMemcpyHostToDevice));
+    }
+    else
+    {
+        cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<uchar4>();
+        int pitch = width * sizeof(uchar4);
+        if (format == Texture::Format::Float)
+        {
+            channel_desc = cudaCreateChannelDesc<float4>();
+            pitch = width * sizeof(float4);
+        }
+        int channel = 6;
+        cudaExtent extent = make_cudaExtent(width, height, channel);
+        checkCudaErrors(cudaMalloc3DArray(&environment_map_array, &channel_desc, extent, cudaArrayCubemap));
 
-    vector<uchar4> tex_data(width * width * channel);
-    for (int i = 0; i < 6; i++)
-        memcpy(tex_data.data() + i * width * width, scene->environment_map[i]->pixels.data(), width * width * sizeof(uchar4));
+        vector<unsigned char> tex_data(pitch * height * channel);
+        for (int i = 0; i < 6; i++)
+            memcpy(tex_data.data() + i * pitch * height, scene->environment_map[i]->get_pixels(), pitch * height);
 
-    cudaMemcpy3DParms copy_params = { 0 };
-    copy_params.srcPtr = make_cudaPitchedPtr(tex_data.data(), width * sizeof(uchar4), width, width);
-    copy_params.dstArray = environment_map_array;
-    copy_params.extent = extent;
-    copy_params.kind = cudaMemcpyHostToDevice;
-    checkCudaErrors(cudaMemcpy3D(&copy_params));
+
+        cudaMemcpy3DParms copy_params = { 0 };
+        copy_params.srcPtr = make_cudaPitchedPtr(tex_data.data(), pitch, width, height);
+        copy_params.dstArray = environment_map_array;
+        copy_params.extent = extent;
+        copy_params.kind = cudaMemcpyHostToDevice;
+        checkCudaErrors(cudaMemcpy3D(&copy_params));
+    }
 
     cudaResourceDesc res_desc = {};
     res_desc.resType = cudaResourceTypeArray;
@@ -381,6 +412,8 @@ void OptixRayTracer::create_environment_map()
     tex_desc.addressMode[2] = cudaAddressModeWrap;
     tex_desc.filterMode = cudaFilterModeLinear;
     tex_desc.readMode = cudaReadModeNormalizedFloat;
+    if (format == Texture::Format::Float)
+        tex_desc.readMode = cudaReadModeElementType;
     tex_desc.normalizedCoords = 1;
     tex_desc.maxAnisotropy = 1;
     tex_desc.maxMipmapLevelClamp = 99;
@@ -451,23 +484,28 @@ void OptixRayTracer::create_light()
 
         weight_sum += area_sum * area_lights[idx].intensity;
     }
-    diffuse_area_light_buffer.resize_and_copy_from_host(area_lights);
+    light_buffer.resize_and_copy_from_host(area_lights);
 
     // build infinite light
-    InfiniteLight infinite_light;
-    infinite_light.emission_color = scene->background;
-    if (!scene->environment_map.empty())
+    EnvironmentLight elight;
+    elight.emission_color = scene->background;
+    if (scene->environment_map.size() == 1)
     {
-        infinite_light.has_texture = true;
-        infinite_light.texture = environment_map;
+        elight.type = EnvironmentLight::Type::UVMap;
+        elight.texture = environment_map;
     }
-    infinite_light_buffer.resize_and_copy_from_host(&infinite_light, 1);
+    else if (scene->environment_map.size() == 6)
+    {
+        elight.type = EnvironmentLight::Type::CubeMap;
+        elight.texture = environment_map;
+    }
+    environment_buffer.resize_and_copy_from_host(&elight, 1);
 
     // merge lights
     light.num = cnt;
-    light.diffuse_area_lights = diffuse_area_light_buffer.data();
+    light.lights = light_buffer.data();
     light.weight_sum = weight_sum;
-    light.infinite_light = infinite_light_buffer.data();
+    light.environment = environment_buffer.data();
 }
 
 void OptixRayTracer::build_sbt()

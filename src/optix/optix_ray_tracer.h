@@ -47,11 +47,11 @@ protected:
     // light
     Light light;
     
-    GPUMemory<DiffuseAreaLight> diffuse_area_light_buffer;
+    GPUMemory<DiffuseAreaLight> light_buffer;
     vector<GPUMemory<float> > light_area_buffer;
     vector<int> meshid_to_lightid;
 
-    GPUMemory<InfiniteLight> infinite_light_buffer;
+    GPUMemory<EnvironmentLight> environment_buffer;
     cudaArray_t environment_map_array;
     cudaTextureObject_t environment_map;
 

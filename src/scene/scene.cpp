@@ -87,8 +87,9 @@ int Scene::add_textures(shared_ptr<Texture> texture, string name)
 
 void Scene::load_environment_map(const vector<string>& faces)
 {
-    assert(faces.size() == 6);
-    for (int i = 0; i < 6; i++)
+    int num = faces.size();
+    assert(num == 1 || num == 6);
+    for(int i = 0; i < num; i++)
     {
         shared_ptr<Texture> texture = make_shared<Texture>();
         texture->load_from_file(faces[i]);

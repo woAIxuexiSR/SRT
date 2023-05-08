@@ -45,7 +45,7 @@ void test()
     {
         shared_ptr<Texture> tex = make_shared<Texture>();
         tex->load_from_file(faces[i]);
-        memcpy(tex_data.data() + i * width * height, tex->pixels.data(), width * height * sizeof(uchar4)); 
+        memcpy(tex_data.data() + i * width * height, tex->get_pixels(), width * height * sizeof(uchar4)); 
     }
 
 
@@ -109,6 +109,7 @@ int main()
         skybox_path / "bottom.jpg",
         skybox_path / "front.jpg",
         skybox_path / "back.jpg"
+        // skybox_path.parent_path() / "dam_wall_4k.hdr"
     };
 
     shared_ptr<Scene> scene = make_shared<Scene>();

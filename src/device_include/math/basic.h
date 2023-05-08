@@ -9,6 +9,14 @@ __host__ __device__ inline float radians(float deg)
     return deg * M_PI / 180.0f;
 }
 
+__host__ __device__ inline float2 dir_to_spherical(float3 dir)
+{
+    // z axis is up
+    float phi = atan2(dir.y, dir.x);
+    float theta = acos(dir.z);
+    return make_float2(phi, theta);
+}
+
 // pack pointer
 __host__ __device__ inline thrust::pair<unsigned, unsigned> pack_pointer(void* ptr)
 {

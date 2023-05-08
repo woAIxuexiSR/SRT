@@ -77,24 +77,42 @@ public:
 };
 
 
-class InfiniteLight
+class EnvironmentLight
 {
 public:
-    bool has_texture { false };
-    cudaTextureObject_t texture;
 
-    float3 emission_color;
-    float intensity{ 1.0f };
+    enum class Type
+    {
+        Constant,
+        UVMap,
+        CubeMap,
+    };
+
+    Type type{ Type::Constant };
+    float3 emission_color{ 0.0f, 0.0f, 0.0f };
+    cudaTextureObject_t texture{ 0 };
 
 public:
-    __host__ __device__ InfiniteLight() {}
+    __host__ __device__ EnvironmentLight() {}
 
     __device__ float3 emission(float3 dir)
     {
-        float3 color = emission_color;
-        if (has_texture)
-            color = make_float3(texCubemap<float4>(texture, dir.x, dir.y, dir.z));
-        return color * intensity;
+        switch (type)
+        {
+        case Type::Constant:
+            return emission_color;
+        case Type::UVMap:
+        {
+            float3 world_dir = make_float3(dir.x, -dir.z, dir.y);
+            float2 phi_theta = dir_to_spherical(world_dir);
+            float2 texcoord = make_float2(phi_theta.x * 0.5f * M_1_PI + 0.5f, phi_theta.y * M_1_PI);
+            return make_float3(tex2D<float4>(texture, texcoord.x, texcoord.y));
+        }
+        case Type::CubeMap:
+            return make_float3(texCubemap<float4>(texture, dir.x, dir.y, dir.z));
+        default:
+            return { 0.0f, 0.0f, 0.0f };
+        }
     }
 };
 
@@ -104,10 +122,10 @@ class Light
 {
 public:
     int num;
-    DiffuseAreaLight* diffuse_area_lights;
+    DiffuseAreaLight* lights;
     float weight_sum;
 
-    InfiniteLight* infinite_light;
+    EnvironmentLight* environment;
 
 public:
     __host__ __device__ Light() {}
@@ -118,11 +136,11 @@ public:
         float sum = 0.0f;
         for (int i = 0; i < num; i++)
         {
-            float wi = diffuse_area_lights[i].area_sum * diffuse_area_lights[i].intensity;
+            float wi = lights[i].area_sum * lights[i].intensity;
             if (s <= sum + wi || i == num - 1)
             {
                 rnd.x = clamp((s - sum) / wi, 0.0f, 1.0f);
-                LightSample ls = diffuse_area_lights[i].sample(rnd);
+                LightSample ls = lights[i].sample(rnd);
                 ls.pdf *= wi / weight_sum;
                 return ls;
             }
@@ -135,11 +153,11 @@ public:
     // sample proportional to area * intensity
     __device__ float sample_pdf(int idx)
     {
-        return diffuse_area_lights[idx].intensity / weight_sum;
+        return lights[idx].intensity / weight_sum;
     }
 
     __device__ float3 environment_emission(float3 dir)
     {
-        return infinite_light->emission(dir);
+        return environment->emission(dir);
     }
 };
