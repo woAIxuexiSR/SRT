@@ -12,4 +12,6 @@ struct HitInfo
     
     const Material* mat;
     float3 color;
+
+    int light_id;
 };

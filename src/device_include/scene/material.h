@@ -77,7 +77,8 @@ class Material
 public:
     MaterialType type{ MaterialType::Diffuse };
     float3 color{ 0.0f, 0.0f, 0.0f };
-    float3 emission{ 0.0f, 0.0f, 0.0f };
+    float3 emission_color{ 0.0f, 0.0f, 0.0f };
+    float intensity{ 0.0f };
 
     float params[MAX_MATERIAL_PARAMETERS]
     { 1.5f, 0.0f, 0.0f, 0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
@@ -85,9 +86,10 @@ public:
 public:
     __host__ __device__ Material() {}
     __host__ __device__ float3 get_color() const { return color; }
-    __host__ __device__ float3 get_emission() const { return emission; }
+    __host__ __device__ float3 get_emission_color() const { return emission_color; }
+    __host__ __device__ float get_intensity() const { return intensity; }
 
-    __host__ __device__ bool is_emissive() const { return length(emission) > 0.0f; }
+    __host__ __device__ bool is_emissive() const { return length(emission_color) > 0.0f && intensity > 0.0f; }
     __host__ __device__ bool is_specular() const { return type == MaterialType::Dielectric; }
     __host__ __device__ bool is_transmissive() const
     {

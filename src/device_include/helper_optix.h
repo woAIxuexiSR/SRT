@@ -51,6 +51,7 @@ struct HitgroupData
     float2* texcoord;
 
     int mesh_id;
+    int light_id;
     Material mat;
     bool has_texture;
     cudaTextureObject_t texture;

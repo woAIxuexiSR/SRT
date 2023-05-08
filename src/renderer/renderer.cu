@@ -6,11 +6,11 @@ Renderer::Renderer(int _w, int _h, shared_ptr<Scene> _scene)
     film = make_shared<Film>(width, height);
 
     shared_ptr<RenderProcess> pt = make_shared<PathTracer>(_w, _h, _scene);
-    shared_ptr<AccumulateProcess> ap = make_shared<AccumulateProcess>(_w, _h);
+    // shared_ptr<AccumulateProcess> ap = make_shared<AccumulateProcess>(_w, _h);
     shared_ptr<DenoiseProcess> dn = make_shared<DenoiseProcess>(_w, _h);
     shared_ptr<ToneMappingProcess> tm = make_shared<ToneMappingProcess>(ToneMappingType::None, _w, _h);
     processes.push_back(pt);
-    processes.push_back(ap);
+    // processes.push_back(ap);
     processes.push_back(dn);
     processes.push_back(tm);
 }

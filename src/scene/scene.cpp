@@ -54,12 +54,12 @@ int Scene::add_animated_mesh(shared_ptr<AnimatedTriangleMesh> mesh, int material
     mesh->material_id = material_id;
     if (material_to_texture.find(material_id) != material_to_texture.end())
         mesh->texture_id = material_to_texture[material_id];
-    
-    if(meshes.empty() && animated_meshes.empty())
+
+    if (meshes.empty() && animated_meshes.empty())
         aabb = mesh->aabb;
     else
         aabb.expand(mesh->aabb);
-    
+
     int id = animated_meshes.size();
     animated_meshes.push_back(mesh);
     return id;
@@ -83,6 +83,17 @@ int Scene::add_textures(shared_ptr<Texture> texture, string name)
     textures.push_back(texture);
     texture_names.push_back(name);
     return id;
+}
+
+void Scene::load_environment_map(const vector<string>& faces)
+{
+    assert(faces.size() == 6);
+    for (int i = 0; i < 6; i++)
+    {
+        shared_ptr<Texture> texture = make_shared<Texture>();
+        texture->load_from_file(faces[i]);
+        environment_map.push_back(texture);
+    }
 }
 
 void convert_material(aiMaterial* amat, shared_ptr<Material> material)
@@ -118,7 +129,8 @@ void convert_material(aiMaterial* amat, shared_ptr<Material> material)
 
     material->type = MaterialType::Disney;
     material->color = make_float3(diffuse.r, diffuse.g, diffuse.b);
-    material->emission = make_float3(emission.r, emission.g, emission.b) * emissiveStrength;
+    material->emission_color = make_float3(emission.r, emission.g, emission.b);
+    material->intensity = emissiveStrength;
     set_material_property(material, "ior", ior);
     set_material_property(material, "metallic", metallic);
     set_material_property(material, "roughness", roughness);

@@ -52,6 +52,8 @@ extern "C" __global__ void __closesthit__radiance()
         float4 tex = tex2D<float4>(sbtData.texture, tc.x, tc.y);
         prd.color = make_float3(tex.x, tex.y, tex.z);
     }
+
+    prd.light_id = sbtData.light_id;
 }
 
 extern "C" __global__ void __closesthit__shadow()
@@ -106,7 +108,7 @@ extern "C" __global__ void __raygen__()
 
             if (!info.hit)
             {
-                L += beta * params.extra.background;
+                L += beta * light.environment_emission(ray.dir);
                 break;
             }
 
@@ -115,15 +117,15 @@ extern "C" __global__ void __raygen__()
                 if (info.inner)
                     break;
                 if (specular)
-                    L += beta * info.mat->get_emission();
+                    L += beta * info.mat->get_emission_color() * info.mat->get_intensity();
                 else
                 {
                     float t2 = dot(info.pos - ray.pos, info.pos - ray.pos);
-                    float light_pdf = light.sample_pdf() * t2 / dot(info.normal, -ray.dir);
+                    float light_pdf = light.sample_pdf(info.light_id) * t2 / dot(info.normal, -ray.dir);
                     // float mat_pdf = scatter_pdf;
                     float mat_pdf = cosine_hemisphere_pdf(cos_theta);
                     float mis_weight = mat_pdf / (light_pdf + mat_pdf);
-                    L += beta * info.mat->get_emission() * mis_weight;
+                    L += beta * info.mat->get_emission_color() * info.mat->get_intensity() * mis_weight;
                 }
                 break;
             }

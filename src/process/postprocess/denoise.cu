@@ -95,4 +95,5 @@ void DenoiseProcess::render(shared_ptr<Film> film)
 
 void DenoiseProcess::render_ui()
 {
+    ImGui::Checkbox("Denoise", &enable);
 }

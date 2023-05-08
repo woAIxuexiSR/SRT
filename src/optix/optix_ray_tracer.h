@@ -46,11 +46,14 @@ protected:
 
     // light
     Light light;
-    GPUMemory<float3> light_vertex_buffer;
-    GPUMemory<uint3> light_index_buffer;
-    GPUMemory<float3> light_normal_buffer;
-    GPUMemory<float> light_area_buffer;
-    GPUMemory<float3> light_emission_buffer;
+    
+    GPUMemory<DiffuseAreaLight> diffuse_area_light_buffer;
+    vector<GPUMemory<float> > light_area_buffer;
+    vector<int> meshid_to_lightid;
+
+    GPUMemory<InfiniteLight> infinite_light_buffer;
+    cudaArray_t environment_map_array;
+    cudaTextureObject_t environment_map;
 
 private:
     void init_optix();
@@ -59,8 +62,9 @@ private:
     void create_pipeline(const vector<string>& ptxs);
     void build_as();
     void create_textures();
-    void build_sbt();
+    void create_environment_map();
     void create_light();
+    void build_sbt();
 
 public:
     OptixRayTracer(const vector<string>& _ptxfiles, shared_ptr<Scene> _scene);

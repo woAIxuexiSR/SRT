@@ -347,6 +347,129 @@ void OptixRayTracer::create_textures()
     }
 }
 
+void OptixRayTracer::create_environment_map()
+{
+    if (scene->environment_map.empty())
+        return;
+    assert(scene->environment_map.size() == 6);
+
+    int width = scene->environment_map[0]->resolution.x;
+    int channel = 6;
+
+    cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<uchar4>();
+    cudaExtent extent = make_cudaExtent(width, width, channel);
+    checkCudaErrors(cudaMalloc3DArray(&environment_map_array, &channel_desc, extent, cudaArrayCubemap));
+
+    vector<uchar4> tex_data(width * width * channel);
+    for (int i = 0; i < 6; i++)
+        memcpy(tex_data.data() + i * width * width, scene->environment_map[i]->pixels.data(), width * width * sizeof(uchar4));
+
+    cudaMemcpy3DParms copy_params = { 0 };
+    copy_params.srcPtr = make_cudaPitchedPtr(tex_data.data(), width * sizeof(uchar4), width, width);
+    copy_params.dstArray = environment_map_array;
+    copy_params.extent = extent;
+    copy_params.kind = cudaMemcpyHostToDevice;
+    checkCudaErrors(cudaMemcpy3D(&copy_params));
+
+    cudaResourceDesc res_desc = {};
+    res_desc.resType = cudaResourceTypeArray;
+    res_desc.res.array.array = environment_map_array;
+
+    cudaTextureDesc tex_desc = {};
+    tex_desc.addressMode[0] = cudaAddressModeWrap;
+    tex_desc.addressMode[1] = cudaAddressModeWrap;
+    tex_desc.addressMode[2] = cudaAddressModeWrap;
+    tex_desc.filterMode = cudaFilterModeLinear;
+    tex_desc.readMode = cudaReadModeNormalizedFloat;
+    tex_desc.normalizedCoords = 1;
+    tex_desc.maxAnisotropy = 1;
+    tex_desc.maxMipmapLevelClamp = 99;
+    tex_desc.minMipmapLevelClamp = 0;
+    tex_desc.mipmapFilterMode = cudaFilterModePoint;
+    tex_desc.borderColor[0] = 1.0f;
+    tex_desc.sRGB = 0;
+
+    checkCudaErrors(cudaCreateTextureObject(&environment_map, &res_desc, &tex_desc, nullptr));
+}
+
+void OptixRayTracer::create_light()
+{
+    int mesh_num = (int)scene->meshes.size();
+
+    meshid_to_lightid.resize(mesh_num);
+    int cnt = 0;
+    for (int i = 0; i < mesh_num; i++)
+    {
+        meshid_to_lightid[i] = -1;
+        TriangleMesh& mesh = *(scene->meshes[i]);
+        if (!scene->materials[mesh.material_id]->is_emissive())
+            continue;
+
+        meshid_to_lightid[i] = cnt;
+        cnt++;
+    }
+
+    // build area lights
+    vector<DiffuseAreaLight> area_lights(cnt);
+    light_area_buffer.resize(cnt);
+    float weight_sum = 0.0f;
+    for (int i = 0; i < mesh_num; i++)
+    {
+        if (meshid_to_lightid[i] < 0)
+            continue;
+
+        TriangleMesh& mesh = *(scene->meshes[i]);
+        int idx = meshid_to_lightid[i];
+
+        area_lights[idx].vertices = vertex_buffer[i].data();
+        area_lights[idx].indices = index_buffer[i].data();
+        area_lights[idx].normals = normal_buffer[i].data();
+        area_lights[idx].texcoords = texcoord_buffer[i].data();
+        if (mesh.texture_id >= 0)
+            area_lights[idx].texture = texture_objects[mesh.texture_id];
+
+        area_lights[idx].emission_color = scene->materials[mesh.material_id]->get_emission_color();
+        area_lights[idx].intensity = scene->materials[mesh.material_id]->get_intensity();
+
+        int face_num = (int)mesh.indices.size();
+        vector<float> areas(face_num);
+        float area_sum = 0.0f;
+        for (int j = 0; j < face_num; j++)
+        {
+            uint3& index = mesh.indices[j];
+            float3 v0 = mesh.vertices[index.x];
+            float3 v1 = mesh.vertices[index.y];
+            float3 v2 = mesh.vertices[index.z];
+            areas[j] = 0.5f * length(cross(v1 - v0, v2 - v0));
+            area_sum += areas[j];
+        }
+        light_area_buffer[idx].resize_and_copy_from_host(areas);
+
+        area_lights[idx].face_num = face_num;
+        area_lights[idx].areas = light_area_buffer[idx].data();
+        area_lights[idx].area_sum = area_sum;
+
+        weight_sum += area_sum * area_lights[idx].intensity;
+    }
+    diffuse_area_light_buffer.resize_and_copy_from_host(area_lights);
+
+    // build infinite light
+    InfiniteLight infinite_light;
+    infinite_light.emission_color = scene->background;
+    if (!scene->environment_map.empty())
+    {
+        infinite_light.has_texture = true;
+        infinite_light.texture = environment_map;
+    }
+    infinite_light_buffer.resize_and_copy_from_host(&infinite_light, 1);
+
+    // merge lights
+    light.num = cnt;
+    light.diffuse_area_lights = diffuse_area_light_buffer.data();
+    light.weight_sum = weight_sum;
+    light.infinite_light = infinite_light_buffer.data();
+}
+
 void OptixRayTracer::build_sbt()
 {
     sbts.resize(module_pgs.size());
@@ -387,6 +510,7 @@ void OptixRayTracer::build_sbt()
                 hitgroup_record.data.normal = (float3*)normal_buffer[k].data();
                 hitgroup_record.data.texcoord = (float2*)texcoord_buffer[k].data();
                 hitgroup_record.data.mesh_id = k;
+                hitgroup_record.data.light_id = meshid_to_lightid[k];
                 hitgroup_record.data.mat = *(scene->materials[scene->meshes[k]->material_id]);
                 if (scene->meshes[k]->texture_id >= 0)
                 {
@@ -404,50 +528,6 @@ void OptixRayTracer::build_sbt()
         sbts[i].hitgroupRecordStrideInBytes = sizeof(HitgroupSBTRecord);
         sbts[i].hitgroupRecordCount = (unsigned)hitgroup_records.size();
     }
-}
-
-void OptixRayTracer::create_light()
-{
-    vector<float3> light_vertices;
-    vector<uint3> light_indices;
-    vector<float3> light_normals;
-    vector<float> light_areas;
-    vector<float3> light_emissions;
-    for (int i = 0; i < scene->meshes.size(); i++)
-    {
-        TriangleMesh& mesh = *(scene->meshes[i]);
-        if (!scene->materials[mesh.material_id]->is_emissive())
-            continue;
-        int offset = (int)light_vertices.size();
-        light_vertices.insert(light_vertices.end(), mesh.vertices.begin(), mesh.vertices.end());
-        if (mesh.normals.size() > 0)
-            light_normals.insert(light_normals.end(), mesh.normals.begin(), mesh.normals.end());
-        else
-            light_normals.insert(light_normals.end(), mesh.vertices.size(), make_float3(0.0f, 0.0f, 0.0f));
-
-        for (int j = 0; j < mesh.indices.size(); j++)
-        {
-            uint3 index = mesh.indices[j];
-            light_indices.push_back(index + offset);
-
-            float3 v0 = mesh.vertices[index.x], v1 = mesh.vertices[index.y], v2 = mesh.vertices[index.z];
-            float3 e1 = v1 - v0, e2 = v2 - v0;
-            float area = length(cross(e1, e2)) * 0.5f;
-            light_areas.push_back(area);
-
-            light_emissions.push_back(scene->materials[mesh.material_id]->get_emission());
-        }
-    }
-
-    int num = (int)light_indices.size();
-    float total_area = std::accumulate(light_areas.begin(), light_areas.end(), 0.0f);
-    light_vertex_buffer.resize_and_copy_from_host(light_vertices);
-    light_index_buffer.resize_and_copy_from_host(light_indices);
-    light_normal_buffer.resize_and_copy_from_host(light_normals);
-    light_area_buffer.resize_and_copy_from_host(light_areas);
-    light_emission_buffer.resize_and_copy_from_host(light_emissions);
-    light.set(num, light_vertex_buffer.data(), light_index_buffer.data(), light_normal_buffer.data(),
-        light_area_buffer.data(), light_emission_buffer.data(), total_area);
 }
 
 OptixRayTracer::OptixRayTracer(const vector<string>& _ptxfiles, shared_ptr<Scene> _scene)
@@ -476,11 +556,14 @@ OptixRayTracer::OptixRayTracer(const vector<string>& _ptxfiles, shared_ptr<Scene
     cout << "Creating textures..." << endl;
     create_textures();
 
-    cout << "Building shader binding table..." << endl;
-    build_sbt();
+    cout << "Creating environment map..." << endl;
+    create_environment_map();
 
     cout << "Creating light..." << endl;
     create_light();
+
+    cout << "Building shader binding table..." << endl;
+    build_sbt();
 
     cout << "Optix fully set up!" << endl;
 }
