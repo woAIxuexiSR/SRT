@@ -43,6 +43,8 @@ find_package(ZLIB REQUIRED)
 set(ZLIB_LIB "${ZLIB_LIBRARIES}")
 # tiny exr
 set(TINY_EXR_INCLUDE "${EXTENSIONS_DIR}/tinyexr")
+# json
+set(JSON_INCLUDE "${EXTENSIONS_DIR}/json")
 
 # tiny cuda nn
 add_subdirectory(${EXTENSIONS_DIR}/tiny-cuda-nn)
@@ -113,9 +115,8 @@ list(APPEND PROJECT_INCLUDE
     ${IMZMO_INCLUDE}
     ${CUDA_INCLUDE}
     ${STB_INCLUDE}
-    ${TINY_OBJ_INCLUDE}
-    ${TINY_PLY_INCLUDE}
     ${TINY_EXR_INCLUDE}
+    ${JSON_INCLUDE}
     ${TINY_CUDA_NN_INCLUDE}
     ${OptiX_INCLUDE}
 )
