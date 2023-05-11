@@ -5,9 +5,11 @@
 #include "helper_optix.h"
 #include "my_math.h"
 
-class DenoiseProcess : public RenderProcess
+class Denoise : public RenderProcess
 {
 private:
+    REGISTER_RENDER_PROCESS(Denoise);
+
     CUstream stream;
     OptixDeviceContext context;
     
@@ -20,8 +22,9 @@ private:
     GPUMemory<float4> denoised;
 
 public:
-    DenoiseProcess(int _w, int _h, shared_ptr<Scene> _s = nullptr);
-    ~DenoiseProcess();
+    Denoise() {}
+    Denoise(int _w, int _h, shared_ptr<Scene> _s = nullptr);
+    ~Denoise();
 
     virtual void render(shared_ptr<Film> film) override;
     virtual void render_ui() override;

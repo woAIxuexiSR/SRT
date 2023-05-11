@@ -7,12 +7,14 @@
 class PathTracer : public RenderProcess
 {
 private:
+    REGISTER_RENDER_PROCESS(PathTracer);
+    
     shared_ptr<OptixRayTracer> tracer;
-
     int max_depth = 16;
     int samples_per_pixel = 4;
     
 public:
+    PathTracer() {}
     PathTracer(int _w, int _h, shared_ptr<Scene> _s);
 
     virtual void render(shared_ptr<Film> film) override;

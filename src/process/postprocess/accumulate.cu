@@ -1,6 +1,8 @@
 #include "accumulate.h"
 
-void AccumulateProcess::render(shared_ptr<Film> film)
+REGISTER_RENDER_PROCESS_CPP(Accumulate);
+
+void Accumulate::render(shared_ptr<Film> film)
 {
     if (!enable) return;
 
@@ -16,6 +18,6 @@ void AccumulateProcess::render(shared_ptr<Film> film)
     frame_count++;
 }
 
-void AccumulateProcess::render_ui()
+void Accumulate::render_ui()
 {
 }

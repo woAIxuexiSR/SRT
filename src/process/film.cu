@@ -42,11 +42,8 @@ void Film::save_ldr(const string& filename) const
         cout << "ERROR::Failed to save image: " << filename << endl;
 }
 
-void Film::save_hdr(const string& filename) const
+void Film::save_exr(const string& filename) const
 {
-    string ext = filename.substr(filename.find_last_of(".") + 1);
-    assert(ext == "exr");
-
     EXRHeader header;
     InitEXRHeader(&header);
     EXRImage image;
@@ -103,4 +100,16 @@ void Film::save_hdr(const string& filename) const
     free(header.channels);
     free(header.pixel_types);
     free(header.requested_pixel_types);
+}
+
+void Film::save(const string& filename) const
+{
+    string ext = filename.substr(filename.find_last_of(".") + 1);
+
+    if(ext == "exr")
+        save_exr(filename);
+    else if(ext == "png" || ext == "jpg")
+        save_ldr(filename);
+    else
+        cout << "ERROR::Unsupported image format: " << ext << endl;
 }

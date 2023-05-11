@@ -1,6 +1,8 @@
 #include "tonemapping.h"
 
-void ToneMappingProcess::render(shared_ptr<Film> film)
+REGISTER_RENDER_PROCESS_CPP(ToneMapping);
+
+void ToneMapping::render(shared_ptr<Film> film)
 {
     if (!enable) return;
 
@@ -66,7 +68,7 @@ void ToneMappingProcess::render(shared_ptr<Film> film)
     checkCudaErrors(cudaDeviceSynchronize());
 }
 
-void ToneMappingProcess::render_ui()
+void ToneMapping::render_ui()
 {
 
 }

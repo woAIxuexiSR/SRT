@@ -37,6 +37,7 @@ using tcnn::GPUMemory, tcnn::GPUMatrix;
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <algorithm>
 using std::vector, std::string, std::unordered_map;
 using std::shared_ptr, std::make_shared;
 using std::cout, std::endl;

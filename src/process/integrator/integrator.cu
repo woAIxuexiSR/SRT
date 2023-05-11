@@ -1,5 +1,7 @@
 #include "integrator.h"
 
+REGISTER_RENDER_PROCESS_CPP(PathTracer);
+
 PathTracer::PathTracer(int _w, int _h, shared_ptr<Scene> _s)
     : RenderProcess(_w, _h, _s)
 {

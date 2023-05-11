@@ -1,2 +1,2 @@
 add_library(renderer STATIC "renderer.cu")
-target_link_libraries(renderer PUBLIC process gui)
+target_link_libraries(renderer PUBLIC "-Wl,--whole-archive" gui process "-Wl,--no-whole-archive")

@@ -1,0 +1,70 @@
+{
+    "width": 1920,
+    "height": 1080,
+    "output": "output.png",
+    "render": {
+        "type": "Image",
+        "frame": 1,
+        "process": [
+            {
+                "enable": true,
+                "name": "PathTracer",
+                "params": {
+                    "max_depth": 5,
+                    "samples_per_pixel": 100
+                }
+            },
+            {
+                "enable": true,
+                "name": "Accumulate",
+                "params": {}
+            },
+            {
+                "enable": true,
+                "name": "Denoise",
+                "params": {}
+            },
+            {
+                "enable": true,
+                "name": "ToneMapping",
+                "params": {
+                    "type": "ACES",
+                    "use_gamma": true
+                }
+            }
+        ]
+    },
+    "scene": {
+        "camera": {
+            "type": "PerspectiveCamera",
+            "position": [
+                0,
+                1,
+                5.5
+            ],
+            "target": [
+                0,
+                1,
+                0.5
+            ],
+            "up": [
+                0,
+                1,
+                0
+            ],
+            "fov": 60
+        },
+        "environment": {
+            "type": "Constant",
+            "color": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        "model": {
+            "type": "obj",
+            "path": "../../data/CornellBox/CornellBox-Original.obj"
+        }
+    }
+}

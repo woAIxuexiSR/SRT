@@ -1,6 +1,8 @@
 #include "denoise.h"
 
-DenoiseProcess::DenoiseProcess(int _w, int _h, shared_ptr<Scene> _s)
+REGISTER_RENDER_PROCESS_CPP(Denoise);
+
+Denoise::Denoise(int _w, int _h, shared_ptr<Scene> _s)
     : RenderProcess(_w, _h, _s), denoised(_w * _h), intensity(1)
 {
     checkCudaErrors(cudaStreamCreate(&stream));
@@ -33,12 +35,12 @@ DenoiseProcess::DenoiseProcess(int _w, int _h, shared_ptr<Scene> _s)
     ));
 }
 
-DenoiseProcess::~DenoiseProcess()
+Denoise::~Denoise()
 {
     OPTIX_CHECK(optixDenoiserDestroy(denoiser));
 }
 
-void DenoiseProcess::render(shared_ptr<Film> film)
+void Denoise::render(shared_ptr<Film> film)
 {
     if(!enable) return;
 
@@ -93,7 +95,7 @@ void DenoiseProcess::render(shared_ptr<Film> film)
     checkCudaErrors(cudaMemcpy(film->get_pixels(), denoised.data(), width * height * sizeof(float4), cudaMemcpyDeviceToDevice));
 }
 
-void DenoiseProcess::render_ui()
+void Denoise::render_ui()
 {
     ImGui::Checkbox("Denoise", &enable);
 }

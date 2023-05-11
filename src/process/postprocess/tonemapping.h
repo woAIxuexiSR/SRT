@@ -13,15 +13,18 @@ enum class ToneMappingType
     ACES
 };
 
-class ToneMappingProcess : public RenderProcess
+class ToneMapping : public RenderProcess
 {
 private:
+    REGISTER_RENDER_PROCESS(ToneMapping);
+
     ToneMappingType type;
     float exposure;
     bool use_gamma;
 
 public:
-    ToneMappingProcess(ToneMappingType _t, int _w, int _h, shared_ptr<Scene> _s = nullptr)
+    ToneMapping() {}
+    ToneMapping(ToneMappingType _t, int _w, int _h, shared_ptr<Scene> _s = nullptr)
         : type(_t), exposure(0.0f), use_gamma(true), RenderProcess(_w, _h, _s)
     {}
 

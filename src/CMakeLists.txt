@@ -23,5 +23,5 @@ target_link_libraries(main PUBLIC renderer)
 # add_executable(metric metric.cpp)
 # target_link_libraries(metric PUBLIC definition)
 
-# add_executable(test test.cu)
-# target_link_libraries(test PUBLIC renderer)
+add_executable(test test.cu)
+target_link_libraries(test PUBLIC renderer)
