@@ -160,6 +160,11 @@ __host__ __device__ inline SquareMatrix<N> Transpose(const SquareMatrix<N>& m)
     return t;
 }
 
+__host__ __device__ inline float Determinant(const SquareMatrix<2>& m)
+{
+    return m[0][0] * m[1][1] - m[0][1] * m[1][0];
+}
+
 __host__ __device__ inline float Determinant(const SquareMatrix<3>& m)
 {
     return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
@@ -181,6 +186,22 @@ __host__ __device__ inline float Determinant(const SquareMatrix<4>& m)
            m[0][3] * (m[1][0] * (m[2][1] * m[3][2] - m[2][2] * m[3][1]) -
                       m[1][1] * (m[2][0] * m[3][2] - m[2][2] * m[3][0]) +
                       m[1][2] * (m[2][0] * m[3][1] - m[2][1] * m[3][0]));
+}
+
+__host__ __device__ inline thrust::optional<SquareMatrix<2> > Inverse(const SquareMatrix<2>& m)
+{
+    float det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
+    if(det == 0)
+        return thrust::nullopt;
+
+    float invDet = 1.0f / det;
+    SquareMatrix<2> inv;
+    inv[0][0] = m[1][1] * invDet;
+    inv[0][1] = -m[0][1] * invDet;
+    inv[1][0] = -m[1][0] * invDet;
+    inv[1][1] = m[0][0] * invDet;
+
+    return inv;
 }
 
 __host__ __device__ inline thrust::optional<SquareMatrix<3> > Inverse(const SquareMatrix<3>& m)
@@ -232,22 +253,22 @@ __host__ __device__ inline thrust::optional<SquareMatrix<4> > Inverse(const Squa
     
     float invDet = 1.0f / det;
     float inv[4][4] = {
-        {   (m[1][1] * c5 + m[1][3] * c3 - m[1][2] * c4) * invDet,
-            (m[1][2] * c4 + m[1][0] * c5 - m[1][3] * c2) * invDet,
-            (m[1][3] * c2 + m[1][1] * c4 - m[1][0] * c3) * invDet,
-            (m[1][0] * c4 + m[1][2] * c3 - m[1][1] * c2) * invDet },
-        {   (m[3][1] * s5 + m[3][3] * s3 - m[3][2] * s4) * invDet,
-            (m[3][2] * s4 + m[3][0] * s5 - m[3][3] * s2) * invDet,
-            (m[3][3] * s2 + m[3][1] * s4 - m[3][0] * s3) * invDet,
-            (m[3][0] * s4 + m[3][2] * s3 - m[3][1] * s2) * invDet },
-        {   (m[2][1] * c5 + m[2][3] * c3 - m[2][2] * c4) * invDet,
-            (m[2][2] * c4 + m[2][0] * c5 - m[2][3] * c2) * invDet,
-            (m[2][3] * c2 + m[2][1] * c4 - m[2][0] * c3) * invDet,
-            (m[2][0] * c4 + m[2][2] * c3 - m[2][1] * c2) * invDet },
-        {   (m[0][1] * s5 + m[0][3] * s3 - m[0][2] * s4) * invDet,
-            (m[0][2] * s4 + m[0][0] * s5 - m[0][3] * s2) * invDet,
-            (m[0][3] * s2 + m[0][1] * s4 - m[0][0] * s3) * invDet,
-            (m[0][0] * s4 + m[0][2] * s3 - m[0][1] * s2) * invDet }
+        {   ( m[1][1] * c5 - m[1][2] * c4 + m[1][3] * c3) * invDet,
+            (-m[0][1] * c5 + m[0][2] * c4 - m[0][3] * c3) * invDet,
+            ( m[3][1] * s5 - m[3][2] * s4 + m[3][3] * s3) * invDet,
+            (-m[2][1] * s5 + m[2][2] * s4 - m[2][3] * s3) * invDet },
+        {   (-m[1][0] * c5 + m[1][2] * c2 - m[1][3] * c1) * invDet,
+            ( m[0][0] * c5 - m[0][2] * c2 + m[0][3] * c1) * invDet,
+            (-m[3][0] * s5 + m[3][2] * s2 - m[3][3] * s1) * invDet,
+            ( m[2][0] * s5 - m[2][2] * s2 + m[2][3] * s1) * invDet },
+        {   ( m[1][0] * c4 - m[1][1] * c2 + m[1][3] * c0) * invDet,
+            (-m[0][0] * c4 + m[0][1] * c2 - m[0][3] * c0) * invDet,
+            ( m[3][0] * s4 - m[3][1] * s2 + m[3][3] * s0) * invDet,
+            (-m[2][0] * s4 + m[2][1] * s2 - m[2][3] * s0) * invDet },
+        {   (-m[1][0] * c3 + m[1][1] * c1 - m[1][2] * c0) * invDet,
+            ( m[0][0] * c3 - m[0][1] * c1 + m[0][2] * c0) * invDet,
+            (-m[3][0] * s3 + m[3][1] * s1 - m[3][2] * s0) * invDet,
+            ( m[2][0] * s3 - m[2][1] * s1 + m[2][2] * s0) * invDet}
     };
 
     return SquareMatrix<4>(inv);

@@ -17,6 +17,13 @@ __host__ __device__ inline float2 dir_to_spherical(float3 dir)
     return make_float2(phi, theta);
 }
 
+__host__ __device__ inline float3 spherical_to_dir(float2 spherical)
+{
+    float sin_theta = sin(spherical.y);
+    float cos_theta = cos(spherical.y);
+    return make_float3(cos(spherical.x) * sin_theta, sin(spherical.x) * sin_theta, cos_theta);
+}
+
 // pack pointer
 __host__ __device__ inline thrust::pair<unsigned, unsigned> pack_pointer(void* ptr)
 {

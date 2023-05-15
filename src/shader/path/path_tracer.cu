@@ -93,7 +93,7 @@ extern "C" __global__ void __raygen__()
     {
         float xx = (ix + rng.random_float()) / params.width;
         float yy = (iy + rng.random_float()) / params.height;
-        Ray ray = camera.get_ray(xx, yy);
+        Ray ray = camera.get_ray(xx, yy, rng);
 
         float3 L = make_float3(0.0f), beta = make_float3(1.0f);
         bool specular = true;

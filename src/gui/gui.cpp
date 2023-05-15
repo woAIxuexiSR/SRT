@@ -234,17 +234,17 @@ void GUI::process_input()
     WindowUserData* ud = (WindowUserData*)glfwGetWindowUserPointer(window);
     float deltaTime = static_cast<float>(glfwGetTime()) - ud->last_time;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        ud->camera->process_keyboard_input(ACTION::UP, deltaTime);
+        ud->camera->process_keyboard_input(CameraMovement::UP, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        ud->camera->process_keyboard_input(ACTION::DOWN, deltaTime);
+        ud->camera->process_keyboard_input(CameraMovement::DOWN, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        ud->camera->process_keyboard_input(ACTION::LEFT, deltaTime);
+        ud->camera->process_keyboard_input(CameraMovement::LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        ud->camera->process_keyboard_input(ACTION::RIGHT, deltaTime);
+        ud->camera->process_keyboard_input(CameraMovement::RIGHT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-        ud->camera->process_keyboard_input(ACTION::FRONT, deltaTime);
+        ud->camera->process_keyboard_input(CameraMovement::FORWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-        ud->camera->process_keyboard_input(ACTION::BACK, deltaTime);
+        ud->camera->process_keyboard_input(CameraMovement::BACKWARD, deltaTime);
     ud->last_time = static_cast<float>(glfwGetTime());
 }
 

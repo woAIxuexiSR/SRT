@@ -17,13 +17,17 @@ Renderer::Renderer(int _w, int _h, shared_ptr<Scene> _scene)
 
 void Renderer::run()
 {
-    TICK(time);
-    for(int i = 0 ; i < 32; i++)
-    for (auto process : processes)
-        process->render(film);
-    TOCK(time);
+    {
+        PROFILE("Render");
+        for (int i = 0; i < 32; i++)
+            for (auto process : processes)
+                process->render(film);
+    }
 
-    film->save("hhh.png");
+    {
+        PROFILE("Save");
+        film->save("hhh.png");
+    }
     // film->save("hhh.exr");
 
     // shared_ptr<GUI> gui = make_shared<GUI>(width, height, scene->camera);
@@ -40,4 +44,6 @@ void Renderer::run()
     //     gui->write_texture(film->get_pixels());
     //     gui->end_frame();
     // }
+    Profiler::print();
+    Profiler::reset();
 }

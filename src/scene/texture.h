@@ -6,12 +6,7 @@
 class Texture
 {
 public:
-
-    enum class Format
-    {
-        Float,
-        Uchar
-    };
+    enum class Format { Float, Uchar };
 
     Format format;
     vector<float4> pixels_f;
@@ -20,7 +15,7 @@ public:
 
 public:
     Texture() : resolution({ 0, 0 }) {}
-    
+
     void load_from_file(const string& filename);
     void* get_pixels();
 };

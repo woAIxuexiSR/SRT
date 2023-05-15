@@ -20,14 +20,17 @@ int main(int argc, char** argv)
     auto vec_to_f3 = [](const vector<float>& v) -> float3 {
         return { v[0], v[1], v[2] };
     };
-    Transform transform = LookAt(
+    Transform transform = Transform::LookAt(
         vec_to_f3(camera_config.at("position")),
         vec_to_f3(camera_config.at("target")),
         vec_to_f3(camera_config.at("up"))
     );
     float aspect = (float)width / (float)height;
     float fov = camera_config.at("fov");
-    shared_ptr<Camera> camera = make_shared<Camera>(transform.get_matrix(), aspect, fov);
+    shared_ptr<Camera> camera = make_shared<Camera>(Camera::Mode::Perspective, aspect, fov);
+    // shared_ptr<Camera> camera = make_shared<Camera>(Camera::Mode::Environment, aspect, fov);
+    // camera->set_thin_lens(5.0f, 0.1f);
+    camera->set_controller(CameraController::Type::Orbit, transform);
 
     // std::filesystem::path env_path(__FILE__);
     // env_path = env_path.parent_path().parent_path() / "data" / "skybox";

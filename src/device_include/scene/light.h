@@ -80,13 +80,7 @@ public:
 class EnvironmentLight
 {
 public:
-
-    enum class Type
-    {
-        Constant,
-        UVMap,
-        CubeMap,
-    };
+    enum class Type { Constant, UVMap, CubeMap, };
 
     Type type{ Type::Constant };
     float3 emission_color{ 0.0f, 0.0f, 0.0f };

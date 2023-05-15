@@ -3,221 +3,218 @@
 #include <cuda_runtime.h>
 #include "my_math.h"
 
-enum class ACTION { UP, DOWN, LEFT, RIGHT, FRONT, BACK };
+/*
+right hand coordinate system
+    - z axis : front
+    - x axis : left
+    - y axis : up
+*/
 
-class Camera
+enum class CameraMovement { UP, DOWN, LEFT, RIGHT, FORWARD, BACKWARD };
+
+class CameraController
 {
 public:
-    float3 pos, front, up, right;
-    float aspect, fov;
-    float3 horizontal, vertical;
+    enum class Type { Orbit, FPS };
+
+    Type type;
+    float3 pos, target;
+    float3 z, x, y;
+    float theta, phi;   // different meaning for different type
+    float radius;       // only for orbit
 
 public:
-    __host__ __device__ Ray get_ray(float x, float y) const
+    __device__ Ray to_world(Ray ray) const
     {
-        return Ray(pos, normalize(front + horizontal * (x - 0.5f) + vertical * (y - 0.5f)));
+        float3 p = ray.pos.x * x + ray.pos.y * y + ray.pos.z * z + pos;
+        float3 d = ray.dir.x * x + ray.dir.y * y + ray.dir.z * z;
+        return Ray(p, d);
     }
 
-    __host__ __device__ thrust::pair<float, float> get_xy(float3 dir) const
+    __device__ Ray to_local(Ray ray) const
     {
-        float cost_dir = dot(front, dir);
-        if (cost_dir < 0.0f)
-            return thrust::make_pair(-1.0f, -1.0f);
-        float3 f = front * cost_dir;
-        float3 v = (dir - f) * cost_dir / dot(f, dir);
-        float x = dot(v, horizontal) / dot(horizontal, horizontal) + 0.5f;
-        float y = dot(v, vertical) / dot(vertical, vertical) + 0.5f;
-        return thrust::make_pair(x, y);
-    }
-
-    __host__ __device__ Transform get_transform() const
-    {
-        return Transform(SquareMatrix<4>(
-            right.x, right.y, right.z, -pos.x,
-            up.x, up.y, up.z, -pos.y,
-            front.x, front.y, front.z, -pos.z,
-            0.0f, 0.0f, 0.0f, 1.0f));
-    }
-
-    __host__ __device__ Transform get_inv_transform() const
-    {
-        return Inverse(get_transform());
+        float3 p = ray.pos - pos;
+        p = make_float3(dot(p, x), dot(p, y), dot(p, z));
+        float3 d = make_float3(dot(ray.dir, x), dot(ray.dir, y), dot(ray.dir, z));
+        return Ray(p, d);
     }
 
     // host function
-    Camera(): pos({ 0.0f, 0.0f, 0.0f }), front({ 0.0f, 0.0f, 1.0f }), up({ 0.0f, 1.0f, 0.0f }),
-        right({ 1.0f, 0.0f, 0.0f }), aspect(1.0f), fov(60.0f)
+    CameraController(CameraController::Type _t, const Transform& t, float _radius = 1.0f)
+        : type(_t), radius(_radius)
     {
-        float nh = 2.0f * tan(radians(fov * 0.5f));
-        horizontal = right * nh;
-        vertical = up * nh / aspect;
-    }
+        pos = make_float3(t[0][3], t[1][3], t[2][3]);
+        x = make_float3(t[0][0], t[1][0], t[2][0]);
+        y = make_float3(t[0][1], t[1][1], t[2][1]);
+        z = make_float3(t[0][2], t[1][2], t[2][2]);
+        target = pos - z * radius;
 
-    Camera(SquareMatrix<4> transform, float _aspect = 1.0f, float _fov = 60.0f): aspect(_aspect), fov(_fov)
-    {
-        pos = make_float3(transform * make_float4(0.0f, 0.0f, 0.0f, 1.0f));
-        front = make_float3(transform * make_float4(0.0f, 0.0f, 1.0f, 0.0f));
-        up = make_float3(transform * make_float4(0.0f, 1.0f, 0.0f, 0.0f));
-        right = make_float3(transform * make_float4(1.0f, 0.0f, 0.0f, 0.0f));
-
-        float nh = 2.0f * tan(radians(fov * 0.5f));
-        horizontal = right * nh;
-        vertical = up * nh / aspect;
-    }
-
-    Camera(float3 _pos, float3 _target, float3 _up = make_float3(0.0f, 1.0f, 0.0f), float _aspect = 1.0f, float _fov = 60.0f)
-        : pos(_pos), aspect(_aspect), fov(_fov)
-    {
-        front = normalize(_target - _pos);
-        right = normalize(cross(front, _up));
-        up = normalize(cross(right, front));
-
-        float nh = 2.0f * tan(radians(fov * 0.5f));
-        horizontal = right * nh;
-        vertical = up * nh / aspect;
-    }
-
-    void process_keyboard_input(ACTION act, float m)
-    {
-        switch (act)
+        switch (type)
         {
-        case ACTION::UP: pos += up * m; break;
-        case ACTION::DOWN: pos -= up * m; break;
-        case ACTION::LEFT: pos -= right * m; break;
-        case ACTION::RIGHT: pos += right * m; break;
-        case ACTION::FRONT: pos += front * m; break;
-        case ACTION::BACK: pos -= front * m; break;
+        case Type::Orbit:
+        {
+            theta = acos(z.y);
+            phi = atan2(z.x, z.z);
+            break;
+        }
+        case Type::FPS:
+        {
+            theta = -acos(z.y);
+            phi = -atan2(z.x, z.z);
+            break;
+        }
+        default: break;
+        }
+    }
+
+    CameraController() : CameraController(Type::Orbit, Transform()) {}
+
+    void process_keyboard_input(CameraMovement movement, float m)
+    {
+        switch (movement)
+        {
+        case CameraMovement::UP: pos += y * m; target += y * m; break;
+        case CameraMovement::DOWN: pos -= y * m; target -= y * m; break;
+        case CameraMovement::LEFT: pos += x * m; target += x * m; break;
+        case CameraMovement::RIGHT: pos -= x * m; target -= x * m; break;
+        case CameraMovement::FORWARD: pos += z * m; target += z * m; break;
+        case CameraMovement::BACKWARD: pos -= z * m; target -= z * m; break;
         }
     }
 
     void process_mouse_input(float xoffset, float yoffset)
     {
-        Transform m = get_transform();
-        m = m * RotateX(radians(-yoffset)) * RotateY(radians(xoffset));
+        switch (type)
+        {
+        case Type::Orbit:
+        {
+            theta = clamp(theta - yoffset, -89.0f, 89.0f);
+            phi += xoffset;
 
-        front = m.apply_dir(make_float3(0.0f, 0.0f, 1.0f));
-        up = m.apply_dir(make_float3(0.0f, 1.0f, 0.0f));
-        right = m.apply_dir(make_float3(1.0f, 0.0f, 0.0f));
+            float cos_theta = cos(radians(theta)), sin_theta = sin(radians(theta));
+            float cos_phi = cos(radians(phi)), sin_phi = sin(radians(phi));
+            z = make_float3(-cos_phi * sin_theta, -sin_phi * sin_theta, -cos_theta);
+            x = normalize(cross(make_float3(0.0f, 1.0f, 0.0f), z));
+            y = normalize(cross(z, x));
+            pos = target - z * radius;
+        }
+        case Type::FPS:
+        {
+            theta = clamp(theta + yoffset, -89.0f, 89.0f);
+            phi += xoffset;
+
+            float cos_theta = cos(radians(theta)), sin_theta = sin(radians(theta));
+            float cos_phi = cos(radians(phi)), sin_phi = sin(radians(phi));
+            z = make_float3(cos_phi * sin_theta, sin_phi * sin_theta, cos_theta);
+            x = normalize(cross(make_float3(0.0f, 1.0f, 0.0f), z));
+            y = normalize(cross(z, x));
+        }
+        default:
+            break;
+        }
+    }
+};
+
+
+// film plane is at z = -1
+class Camera
+{
+public:
+    enum class Mode { Perspective, Orthographic, ThinLens, Environment };
+
+    CameraController controller;
+    Mode mode;
+    float aspect;
+    float fov, nh, nw;  // for perspective, thin lens
+    float scale;        // for orthographic
+    float focal, aperture;  // for thin lens
+
+public:
+    __device__ Ray get_ray(float x, float y, RandomGenerator& rng) const
+    {
+        switch (mode)
+        {
+        case Mode::Perspective:
+        {
+            float3 dir = normalize(make_float3((x - 0.5f) * nw, (y - 0.5f) * nh, 1.0f));
+            return controller.to_world(Ray(make_float3(0.0f), dir));
+        }
+        case Mode::Orthographic:
+        {
+            float3 pos = make_float3((x - 0.5f) * scale * aspect, (y - 0.5f) * scale, 0.0f);
+            return controller.to_world(Ray(pos, make_float3(0.0f, 0.0f, 1.0f)));
+        }
+        case Mode::ThinLens:
+        {
+            float2 uv = uniform_sample_disk(rng.random_float2());
+            float3 pos = make_float3(uv * aperture, 0.0f);
+            float3 target = make_float3((x - 0.5f) * nw, (y - 0.5f) * nh, 1.0f) * focal;
+            return controller.to_world(Ray(pos, normalize(target - pos)));
+        }
+        case Mode::Environment:
+        {
+            float2 spherical = make_float2(x * 2.0f * M_PI, y * M_PI);
+            float3 dir = spherical_to_dir(spherical);
+            return controller.to_world(Ray(make_float3(0.0f), dir));
+        }
+        default:
+            return Ray();
+        }
+    }
+    __device__ thrust::pair<float, float> get_xy(float3 dir) const
+    {
+        // float cost_dir = dot(front, dir);
+        // if (cost_dir < 0.0f)
+        //     return thrust::make_pair(-1.0f, -1.0f);
+        // float3 f = front * cost_dir;
+        // float3 v = (dir - f) * cost_dir / dot(f, dir);
+        // float x = dot(v, horizontal) / dot(horizontal, horizontal) + 0.5f;
+        // float y = dot(v, vertical) / dot(vertical, vertical) + 0.5f;
+        // return thrust::make_pair(x, y);
+        return thrust::make_pair(0.0f, 0.0f);
+    }
+
+    // host function
+    Camera(Mode _m, float _aspect, float _fov = 60.0f)
+        : mode(_m), aspect(_aspect), fov(_fov)
+    {
+        nw = 2.0f * tan(radians(fov * 0.5f));
+        nh = nw / aspect;
+    }
+
+    Camera() : Camera(Mode::Perspective, 1.0f) {}
+
+    void set_controller(CameraController::Type _t, const Transform& camera_to_world, float _radius = 1.0f)
+    {
+        controller = CameraController(_t, camera_to_world, _radius);
+    }
+
+    void set_orhtographic(float _scale)
+    {
+        scale = _scale;
+    }
+
+    void set_thin_lens(float _focal, float _aperture)
+    {
+        focal = _focal;
+        aperture = _aperture;
+    }
+
+
+    void process_keyboard_input(CameraMovement movement, float m)
+    {
+        controller.process_keyboard_input(movement, m);
+    }
+
+    void process_mouse_input(float xoffset, float yoffset)
+    {
+        controller.process_mouse_input(xoffset, yoffset);
     }
 
     void process_scroll_input(float yoffset)
     {
         fov = clamp(fov - yoffset, 1.0f, 90.0f);
-        float nh = 2.0f * tan(radians(fov * 0.5f));
-        horizontal = right * nh;
-        vertical = up * nh / aspect;
-    }
-};
-
-class Camera_
-{
-public:
-    float3 target;
-    float radius, phi, theta;
-    float aspect, fov;
-
-    float3 pos, horizontal, vertical, lower_left_corner;
-    bool changed;
-
-    static constexpr float3 up = { 0.0f, 1.0f, 0.0f };
-    static constexpr float keyboard_speed = 2.5f;
-    static constexpr float mouse_sensitivity = 0.2f;
-
-    __host__ __device__ Ray get_ray(float x, float y)
-    {
-        return Ray(pos, normalize(lower_left_corner + horizontal * x + vertical * y));
-    }
-
-    // dir must be normalized
-    __host__ __device__ thrust::pair<float, float> get_xy(float3 dir)
-    {
-        float3 forward = lower_left_corner + horizontal * 0.5f + vertical * 0.5f;
-        float cost = dot(forward, dir);
-        if (cost < 0.0f)
-            return thrust::make_pair(-1.0f, -1.0f);
-        float3 f = forward * cost / dot(forward, forward);
-        float3 v = (dir - f) * cost / dot(f, dir);
-        float x = dot(v, horizontal) / dot(horizontal, horizontal) + 0.5f;
-        float y = dot(v, vertical) / dot(vertical, vertical) + 0.5f;
-        return thrust::make_pair(x, y);
-    }
-
-    // host function
-    Camera_(): Camera_(make_float3(0.0f, 0.0f, 1.0f), 1.0f, 1.0f) {}
-
-    Camera_(float3 _t, float _r, float _asp): Camera_(_t, _r, 0.0f, 90.0f, _asp, 60.0f) {}
-
-    Camera_(float3 _t, float _r, float _phi, float _theta, float _asp, float _fov = 60.0f)
-        : target(_t), radius(_r), phi(_phi), theta(_theta), aspect(_asp), fov(_fov)
-    {
-        set_camera();
-    }
-
-    void set_from_matrix(SquareMatrix<4> mat, float _fov, float _asp)
-    {
-        float3 forward = make_float3(mat[2][0], mat[2][1], mat[2][2]);
-        float3 _up = make_float3(mat[1][0], mat[1][1], mat[1][2]);
-        float3 right = make_float3(mat[0][0], mat[0][1], mat[0][2]);
-
-        pos = make_float3(mat[3][0], -mat[3][1], mat[3][2]);
-        float3 nh = normalize(cross(forward, _up));
-        float3 nv = normalize(cross(nh, forward));
-
-        float height = std::tan(radians(_fov * 0.5f));
-        float width = height * _asp;
-
-        horizontal = nh * width;
-        vertical = nv * height;
-        lower_left_corner = forward - horizontal * 0.5f - vertical * 0.5f;
-
-        fov = _fov;
-        aspect = _asp;
-        changed = true;
-    }
-
-    void set_camera()
-    {
-        float cos_theta = std::cos(radians(theta)), sin_theta = std::sin(radians(theta));
-        float cos_phi = std::cos(radians(phi)), sin_phi = std::sin(radians(phi));
-
-        float3 forward = make_float3(-cos_theta * cos_phi, -sin_phi, -sin_theta * cos_phi);
-        pos = target - forward * radius;
-        float3 nh = normalize(cross(forward, up));
-        float3 nv = normalize(cross(nh, forward));
-        float height = std::tan(radians(fov * 0.5f));
-        float width = height * aspect;
-        horizontal = nh * width;
-        vertical = nv * height;
-        lower_left_corner = forward - horizontal * 0.5f - vertical * 0.5f;
-        changed = true;
-    }
-
-    void process_keyboard_input(ACTION act, float deltaTime)
-    {
-        float m = keyboard_speed * deltaTime;
-        switch (act)
-        {
-        case ACTION::UP: target = target + normalize(vertical) * m; break;
-        case ACTION::DOWN: target = target - normalize(vertical) * m; break;
-        case ACTION::LEFT: target = target - normalize(horizontal) * m; break;
-        case ACTION::RIGHT: target = target + normalize(horizontal) * m; break;
-        }
-
-        set_camera();
-    }
-
-    void process_mouse_input(float xoffset, float yoffset)
-    {
-        theta += xoffset * mouse_sensitivity;
-        phi = clamp(phi - yoffset * mouse_sensitivity, -89.0f, 89.0f);
-
-        set_camera();
-    }
-
-    void process_scroll_input(float yoffset)
-    {
-        fov = clamp(fov - yoffset, 1.0f, 120.0f);
-
-        set_camera();
+        nw = 2.0f * tan(radians(fov * 0.5f));
+        nh = nw / aspect;
     }
 };
