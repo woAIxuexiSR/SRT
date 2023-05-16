@@ -228,4 +228,16 @@ void Scene::load_from_model(const string& filename)
 
 void Scene::render_ui()
 {
+    ImGui::Text("Camera"); 
+    ImGui::Text("position: (%.2f, %.2f, %.2f)", camera->controller.pos.x, camera->controller.pos.y, camera->controller.pos.z);
+    ImGui::Text("target: (%.2f, %.2f, %.2f)", camera->controller.target.x, camera->controller.target.y, camera->controller.target.z);
+    ImGui::Text("front: (%.2f, %.2f, %.2f)", camera->controller.z.x, camera->controller.z.y, camera->controller.z.z);
+    ImGui::Text("up: (%.2f, %.2f, %.2f)", camera->controller.y.x, camera->controller.y.y, camera->controller.y.z);
+    ImGui::Text("left: (%.2f, %.2f, %.2f)", camera->controller.x.x, camera->controller.x.y, camera->controller.x.z);
+    ImGui::Text("theta: %.2f", camera->controller.theta);
+    ImGui::Text("phi: %.2f", camera->controller.phi);
+    ImGui::Text("radius: %.2f", camera->controller.radius);
+    ImGui::Text("fov: %.2f", camera->fov);
+
+    ImGui::Combo("controller type", (int*)&camera->controller.type, "None\0Orbit\0FPS\0\0");
 }

@@ -2,6 +2,12 @@
 
 REGISTER_RENDER_PROCESS_CPP(Accumulate);
 
+void Accumulate::resize(int _w, int _h)
+{
+    width = _w; height = _h;
+    accumulated.resize(_w * _h);
+}
+
 void Accumulate::render(shared_ptr<Film> film)
 {
     if (!enable) return;

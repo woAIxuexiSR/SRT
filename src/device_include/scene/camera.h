@@ -15,7 +15,7 @@ enum class CameraMovement { UP, DOWN, LEFT, RIGHT, FORWARD, BACKWARD };
 class CameraController
 {
 public:
-    enum class Type { Orbit, FPS };
+    enum class Type { None, Orbit, FPS };
 
     Type type;
     float3 pos, target;
@@ -47,27 +47,27 @@ public:
         x = make_float3(t[0][0], t[1][0], t[2][0]);
         y = make_float3(t[0][1], t[1][1], t[2][1]);
         z = make_float3(t[0][2], t[1][2], t[2][2]);
-        target = pos - z * radius;
+        target = pos + z * radius;
 
         switch (type)
         {
         case Type::Orbit:
         {
-            theta = acos(z.y);
-            phi = atan2(z.x, z.z);
+            theta = acos(-z.y) * 180.0f / M_PI;
+            phi = atan2(-z.z, -z.x) * 180.0f / M_PI;
             break;
         }
         case Type::FPS:
         {
-            theta = -acos(z.y);
-            phi = -atan2(z.x, z.z);
+            theta = acos(z.y) * 180.0f / M_PI;
+            phi = atan2(z.z, z.x) * 180.0f / M_PI;
             break;
         }
         default: break;
         }
     }
 
-    CameraController() : CameraController(Type::Orbit, Transform()) {}
+    CameraController() : CameraController(Type::None, Transform()) {}
 
     void process_keyboard_input(CameraMovement movement, float m)
     {
@@ -75,8 +75,8 @@ public:
         {
         case CameraMovement::UP: pos += y * m; target += y * m; break;
         case CameraMovement::DOWN: pos -= y * m; target -= y * m; break;
-        case CameraMovement::LEFT: pos += x * m; target += x * m; break;
-        case CameraMovement::RIGHT: pos -= x * m; target -= x * m; break;
+        case CameraMovement::LEFT: pos -= x * m; target -= x * m; break;
+        case CameraMovement::RIGHT: pos += x * m; target += x * m; break;
         case CameraMovement::FORWARD: pos += z * m; target += z * m; break;
         case CameraMovement::BACKWARD: pos -= z * m; target -= z * m; break;
         }
@@ -88,26 +88,31 @@ public:
         {
         case Type::Orbit:
         {
-            theta = clamp(theta - yoffset, -89.0f, 89.0f);
+            theta = clamp(theta + yoffset, 1.0f, 179.0f);
             phi += xoffset;
 
             float cos_theta = cos(radians(theta)), sin_theta = sin(radians(theta));
             float cos_phi = cos(radians(phi)), sin_phi = sin(radians(phi));
-            z = make_float3(-cos_phi * sin_theta, -sin_phi * sin_theta, -cos_theta);
+            z = 0.0f - make_float3(cos_phi * sin_theta, cos_theta, sin_phi * sin_theta);
             x = normalize(cross(make_float3(0.0f, 1.0f, 0.0f), z));
             y = normalize(cross(z, x));
             pos = target - z * radius;
+
+            break;
         }
         case Type::FPS:
         {
-            theta = clamp(theta + yoffset, -89.0f, 89.0f);
+            theta = clamp(theta - yoffset, 1.0f, 179.0f);
             phi += xoffset;
 
             float cos_theta = cos(radians(theta)), sin_theta = sin(radians(theta));
             float cos_phi = cos(radians(phi)), sin_phi = sin(radians(phi));
-            z = make_float3(cos_phi * sin_theta, sin_phi * sin_theta, cos_theta);
+            z = make_float3(cos_phi * sin_theta, cos_theta, sin_phi * sin_theta);
             x = normalize(cross(make_float3(0.0f, 1.0f, 0.0f), z));
             y = normalize(cross(z, x));
+            target = pos + z * radius;
+
+            break;
         }
         default:
             break;
@@ -161,6 +166,7 @@ public:
             return Ray();
         }
     }
+
     __device__ thrust::pair<float, float> get_xy(float3 dir) const
     {
         // float cost_dir = dot(front, dir);

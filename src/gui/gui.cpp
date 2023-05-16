@@ -142,7 +142,7 @@ GUI::GUI(int _w, int _h, shared_ptr<Camera> _c, int n)
                 ud->first_mouse = false;
             }
             float cursor_speed = 0.04f;
-            float xoffset = (static_cast<float>(x) - ud->last_x) * cursor_speed;
+            float xoffset = (ud->last_x - static_cast<float>(x)) * cursor_speed;
             float yoffset = (ud->last_y - static_cast<float>(y)) * cursor_speed;
             ud->last_x = static_cast<float>(x);
             ud->last_y = static_cast<float>(y);

@@ -18,16 +18,32 @@ class ToneMapping : public RenderProcess
 private:
     REGISTER_RENDER_PROCESS(ToneMapping);
 
-    ToneMappingType type;
-    float exposure;
-    bool use_gamma;
+    ToneMappingType type{ ToneMappingType::None };
+    float exposure{ 0.0f };
+    bool use_gamma{ true };
 
 public:
     ToneMapping() {}
-    ToneMapping(ToneMappingType _t, int _w, int _h, shared_ptr<Scene> _s = nullptr)
-        : type(_t), exposure(0.0f), use_gamma(true), RenderProcess(_w, _h, _s)
-    {}
 
     virtual void render(shared_ptr<Film> film) override;
     virtual void render_ui() override;
+
+public:
+    friend void to_json(json& j, const ToneMapping& p)
+    {
+        j = json{
+            { "type", p.type },
+            { "exposure", p.exposure },
+            { "use_gamma", p.use_gamma }
+        };
+    }
+
+    friend void from_json(const json& j, ToneMapping& p)
+    {
+        if (j.is_null()) return;
+
+        p.type = j.value("type", ToneMappingType::None);
+        p.exposure = j.value("exposure", 0.0f);
+        p.use_gamma = j.value("use_gamma", true);
+    }
 };

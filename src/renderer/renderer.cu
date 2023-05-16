@@ -1,49 +1,75 @@
 #include "renderer.h"
 
-Renderer::Renderer(int _w, int _h, shared_ptr<Scene> _scene)
+ImageRenderer::ImageRenderer(int _w, int _h, shared_ptr<Scene> _scene, string _filename)
+    : width(_w), height(_h), scene(_scene), filename(_filename)
+{
+    film = make_shared<Film>(width, height);
+}
+
+void ImageRenderer::load_processes_from_config(const json& config)
+{
+    for (auto& c : config)
+    {
+        string name = c.at("name");
+
+        shared_ptr<RenderProcess> process = RenderProcessFactory::create_process(name, c["params"]);
+        process->set_enable(c.at("enable"));
+        process->resize(width, height);
+        process->set_scene(scene);
+
+        processes.push_back(process);
+    }
+}
+
+void ImageRenderer::run()
+{
+    PROFILE("Render");
+
+    for (auto process : processes)
+        process->render(film);
+    film->save(filename);
+
+    Profiler::stop();
+    Profiler::print();
+    Profiler::reset();
+}
+
+InteractiveRenderer::InteractiveRenderer(int _w, int _h, shared_ptr<Scene> _scene)
     : width(_w), height(_h), scene(_scene)
 {
     film = make_shared<Film>(width, height);
-
-    shared_ptr<RenderProcess> pt = make_shared<PathTracer>(_w, _h, _scene);
-    // shared_ptr<AccumulateProcess> ap = make_shared<AccumulateProcess>(_w, _h);
-    shared_ptr<Denoise> dn = make_shared<Denoise>(_w, _h);
-    shared_ptr<ToneMapping> tm = make_shared<ToneMapping>(ToneMappingType::None, _w, _h);
-    processes.push_back(pt);
-    // processes.push_back(ap);
-    processes.push_back(dn);
-    processes.push_back(tm);
+    gui = make_shared<GUI>(width, height, scene->camera);
 }
 
-void Renderer::run()
+void InteractiveRenderer::load_processes_from_config(const json& config)
 {
+    for (auto& c : config)
     {
-        PROFILE("Render");
-        for (int i = 0; i < 32; i++)
-            for (auto process : processes)
-                process->render(film);
-    }
+        string name = c.at("name");
 
+        shared_ptr<RenderProcess> process = RenderProcessFactory::create_process(name, c["params"]);
+        process->set_enable(c.at("enable"));
+        process->resize(width, height);
+        process->set_scene(scene);
+
+        processes.push_back(process);
+    }
+}
+
+void InteractiveRenderer::run()
+{
+    while(!gui->should_close())
     {
-        PROFILE("Save");
-        film->save("hhh.png");
+        gui->begin_frame();
+
+        scene->render_ui();
+        for (auto process : processes)
+        {
+            process->render(film);
+            process->render_ui();
+        }
+
+        gui->end_frame();
+        gui->write_texture(film->get_pixels());
     }
-    // film->save("hhh.exr");
-
-    // shared_ptr<GUI> gui = make_shared<GUI>(width, height, scene->camera);
-    // while(!gui->should_close())
-    // {
-    //     gui->begin_frame();
-
-    //     for(auto process : processes)
-    //     {
-    //         process->render(film);
-    //         process->render_ui();
-    //     }
-
-    //     gui->write_texture(film->get_pixels());
-    //     gui->end_frame();
-    // }
-    Profiler::print();
-    Profiler::reset();
 }

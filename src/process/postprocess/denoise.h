@@ -12,7 +12,7 @@ private:
 
     CUstream stream;
     OptixDeviceContext context;
-    
+
     OptixDenoiser denoiser;
     OptixDenoiserSizes denoiser_sizes;
     GPUMemory<unsigned char> denoiser_state;
@@ -22,10 +22,14 @@ private:
     GPUMemory<float4> denoised;
 
 public:
-    Denoise() {}
-    Denoise(int _w, int _h, shared_ptr<Scene> _s = nullptr);
+    Denoise();
     ~Denoise();
 
+    virtual void resize(int _w, int _h) override;
     virtual void render(shared_ptr<Film> film) override;
     virtual void render_ui() override;
+
+public:
+    friend void to_json(json& j, const Denoise& p) {}
+    friend void from_json(const json& j, Denoise& p) {}
 };

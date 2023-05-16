@@ -2,8 +2,7 @@
 
 REGISTER_RENDER_PROCESS_CPP(Denoise);
 
-Denoise::Denoise(int _w, int _h, shared_ptr<Scene> _s)
-    : RenderProcess(_w, _h, _s), denoised(_w * _h), intensity(1)
+Denoise::Denoise() : intensity(1)
 {
     checkCudaErrors(cudaStreamCreate(&stream));
 
@@ -16,6 +15,12 @@ Denoise::Denoise(int _w, int _h, shared_ptr<Scene> _s)
     }
 
     OPTIX_CHECK(optixDeviceContextCreate(cuda_context, 0, &context));
+}
+
+void Denoise::resize(int _w, int _h)
+{
+    width = _w; height = _h;
+    denoised.resize(width * height);
 
     OptixDenoiserOptions options = {};
     OPTIX_CHECK(optixDenoiserCreate(context, OPTIX_DENOISER_MODEL_KIND_HDR, &options, &denoiser));
@@ -37,7 +42,7 @@ Denoise::Denoise(int _w, int _h, shared_ptr<Scene> _s)
 
 Denoise::~Denoise()
 {
-    OPTIX_CHECK(optixDenoiserDestroy(denoiser));
+    if(denoiser) OPTIX_CHECK(optixDenoiserDestroy(denoiser));
 }
 
 void Denoise::render(shared_ptr<Film> film)

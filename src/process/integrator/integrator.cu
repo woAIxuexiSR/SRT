@@ -2,11 +2,11 @@
 
 REGISTER_RENDER_PROCESS_CPP(PathTracer);
 
-PathTracer::PathTracer(int _w, int _h, shared_ptr<Scene> _s)
-    : RenderProcess(_w, _h, _s)
+void PathTracer::set_scene(shared_ptr<Scene> _scene)
 {
+    scene = _scene;
     vector<string> ptx_files({ "path_tracer.ptx" });
-    tracer = make_shared<OptixRayTracer>(ptx_files, _s);
+    tracer = make_shared<OptixRayTracer>(ptx_files, _scene);
 }
 
 void PathTracer::render(shared_ptr<Film> film)

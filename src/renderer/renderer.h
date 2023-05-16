@@ -10,7 +10,7 @@
 
 #include "gui.h"
 
-class Renderer
+class ImageRenderer
 {
 private:
     int width, height;
@@ -19,8 +19,31 @@ private:
     shared_ptr<Film> film;
     vector<shared_ptr<RenderProcess> > processes;
 
-public:
-    Renderer(int _w, int _h, shared_ptr<Scene> _scene);
+    string filename;
 
+public:
+    ImageRenderer(int _w, int _h, shared_ptr<Scene> _scene, string _filename);
+    void load_processes_from_config(const json &config);
     void run();
+};
+
+class InteractiveRenderer
+{
+private:
+    int width, height;
+    shared_ptr<Scene> scene;
+
+    shared_ptr<Film> film;
+    vector<shared_ptr<RenderProcess> > processes;
+
+    shared_ptr<GUI> gui;
+
+public:
+    InteractiveRenderer(int _w, int _h, shared_ptr<Scene> _scene);
+    void load_processes_from_config(const json &config);
+    void run();
+};
+
+class VideoRenderer
+{
 };

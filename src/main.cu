@@ -11,7 +11,6 @@ int main(int argc, char** argv)
 
     int width = config.at("width");
     int height = config.at("height");
-    string output = config.value("output", "");
 
     // build scene
     json scene_config = config.at("scene");
@@ -30,19 +29,9 @@ int main(int argc, char** argv)
     shared_ptr<Camera> camera = make_shared<Camera>(Camera::Mode::Perspective, aspect, fov);
     // shared_ptr<Camera> camera = make_shared<Camera>(Camera::Mode::Environment, aspect, fov);
     // camera->set_thin_lens(5.0f, 0.1f);
-    camera->set_controller(CameraController::Type::Orbit, transform);
+    float radius = length(vec_to_f3(camera_config.at("target")) - vec_to_f3(camera_config.at("position")));
+    camera->set_controller(CameraController::Type::Orbit, transform, radius);
 
-    // std::filesystem::path env_path(__FILE__);
-    // env_path = env_path.parent_path().parent_path() / "data" / "skybox";
-    // vector<string> faces = {
-    //     // env_path / "right.jpg",
-    //     // env_path / "left.jpg",
-    //     // env_path / "top.jpg",
-    //     // env_path / "bottom.jpg",
-    //     // env_path / "front.jpg",
-    //     // env_path / "back.jpg"
-    //     env_path.parent_path() / "dam_wall_4k.hdr"
-    // };
 
     json model_config = scene_config.at("model");
     shared_ptr<Scene> scene = make_shared<Scene>();
@@ -51,7 +40,15 @@ int main(int argc, char** argv)
     // scene->load_environment_map(faces);
     // scene->set_background({1.0f, 1.0f, 1.0f});
 
-    Renderer renderer(width, height, scene);
+    // render
+    json render_config = config.at("render");
+
+    string output = render_config.at("output");
+    // ImageRenderer renderer(width, height, scene, output);
+    // renderer.load_processes_from_config(render_config.at("processes"));
+    InteractiveRenderer renderer(width, height, scene);
+    renderer.load_processes_from_config(render_config.at("processes"));
+
     renderer.run();
 
     return 0;
