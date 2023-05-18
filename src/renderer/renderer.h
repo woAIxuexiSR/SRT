@@ -9,6 +9,7 @@
 #include "postprocess/denoise.h"
 
 #include "gui.h"
+#include "pbrtparse.h"
 
 class ImageRenderer
 {

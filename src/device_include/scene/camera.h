@@ -190,6 +190,14 @@ public:
 
     Camera() : Camera(Mode::Perspective, 1.0f) {}
 
+    void set_aspect_fov(float _aspect, float _fov)
+    {
+        aspect = _aspect;
+        fov = _fov;
+        nw = 2.0f * tan(radians(fov * 0.5f));
+        nh = nw / aspect;
+    }
+
     void set_controller(CameraController::Type _t, const Transform& camera_to_world, float _radius = 1.0f)
     {
         controller = CameraController(_t, camera_to_world, _radius);

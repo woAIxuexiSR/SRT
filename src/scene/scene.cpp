@@ -89,12 +89,28 @@ void Scene::load_environment_map(const vector<string>& faces)
 {
     int num = faces.size();
     assert(num == 1 || num == 6);
-    for(int i = 0; i < num; i++)
+    for (int i = 0; i < num; i++)
     {
         shared_ptr<Texture> texture = make_shared<Texture>();
         texture->load_from_file(faces[i]);
         environment_map.push_back(texture);
     }
+}
+
+int Scene::get_material_id(const string& name) const
+{
+    for (int i = 0; i < material_names.size(); i++)
+        if (material_names[i] == name)
+            return i;
+    return -1;
+}
+
+int Scene::get_texture_id(const string& name) const
+{
+    for (int i = 0; i < texture_names.size(); i++)
+        if (texture_names[i] == name)
+            return i;
+    return -1;
 }
 
 void convert_material(aiMaterial* amat, shared_ptr<Material> material)
@@ -201,12 +217,7 @@ void Scene::load_from_model(const string& filename)
         if (amat->GetTextureCount(aiTextureType_DIFFUSE) > 0
             && amat->GetTexture(aiTextureType_DIFFUSE, 0, &texname) == AI_SUCCESS)
         {
-            for (int j = 0; j < texture_names.size(); j++)
-                if (std::strcmp(texture_names[j].c_str(), texname.C_Str()) == 0)
-                {
-                    texture_id = j;
-                    break;
-                }
+            texture_id = get_texture_id(texname.C_Str());
             if (texture_id == -1)
             {
                 shared_ptr<Texture> texture = make_shared<Texture>();
@@ -226,9 +237,39 @@ void Scene::load_from_model(const string& filename)
     }
 }
 
+void Scene::load_from_pbrt(const string& filename)
+{
+    // TODO
+}
+
+void Scene::load_from_config(const json& config, int width, int height)
+{
+    json camera_config = config.at("camera");
+    auto vec_to_f3 = [](const vector<float>& v) -> float3 {
+        return { v[0], v[1], v[2] };
+    };
+    Transform transform = Transform::LookAt(
+        vec_to_f3(camera_config.at("position")),
+        vec_to_f3(camera_config.at("target")),
+        vec_to_f3(camera_config.at("up"))
+    );
+    float aspect = (float)width / (float)height;
+    float fov = camera_config.at("fov");
+    shared_ptr<Camera> camera = make_shared<Camera>(Camera::Mode::Perspective, aspect, fov);
+    // shared_ptr<Camera> camera = make_shared<Camera>(Camera::Mode::Environment, aspect, fov);
+    // camera->set_thin_lens(5.0f, 0.1f);
+    float radius = length(vec_to_f3(camera_config.at("target")) - vec_to_f3(camera_config.at("position")));
+    camera->set_controller(CameraController::Type::Orbit, transform, radius);
+
+
+    json model_config = config.at("model");
+    set_camera(camera);
+    load_from_model(model_config.at("path").get<string>());
+}
+
 void Scene::render_ui()
 {
-    ImGui::Text("Camera"); 
+    ImGui::Text("Camera");
     ImGui::Text("position: (%.2f, %.2f, %.2f)", camera->controller.pos.x, camera->controller.pos.y, camera->controller.pos.z);
     ImGui::Text("target: (%.2f, %.2f, %.2f)", camera->controller.target.x, camera->controller.target.y, camera->controller.target.z);
     ImGui::Text("front: (%.2f, %.2f, %.2f)", camera->controller.z.x, camera->controller.z.y, camera->controller.z.z);

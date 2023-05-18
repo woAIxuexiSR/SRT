@@ -31,6 +31,7 @@ void Texture::load_from_file(const string& filename)
             cout << "ERROR::Failed to Load LDR file: " << filename << endl;
             return;
         }
+        format = Format::Uchar;
     }
 
     if(format == Format::Float)

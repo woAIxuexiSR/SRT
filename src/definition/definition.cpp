@@ -7,3 +7,5 @@
 
 #define TINYEXR_IMPLEMENTATION
 #include "tinyexr.h"
+#define TINYPLY_IMPLEMENTATION
+#include "tinyply.h"

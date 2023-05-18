@@ -42,8 +42,17 @@ public:
     void set_background(float3 _b) { background = _b; }
     void load_environment_map(const vector<string>& faces);
 
+    int get_material_id(const string& name) const;
+    int get_texture_id(const string& name) const;
+
     // obj etc. model
     void load_from_model(const string& filename);
+
+    // pbrt scene
+    void load_from_pbrt(const string& filename);
+
+    // config
+    void load_from_config(const json& config, int width, int height);
 
     // ui
     void render_ui();

@@ -6,6 +6,7 @@
 #define TINYEXR_USE_MINIZ 0
 #include "zlib.h"
 #include "tinyexr.h"
+#include "tinyply.h"
 
 #include "json.hpp"
 using json = nlohmann::json;

@@ -49,6 +49,13 @@ public:
                 m[i][j] = mat[i][j];
     }
 
+    __host__ __device__ SquareMatrix(float mat[N * N])
+    {
+        for(int i = 0; i < N; i++)
+            for(int j = 0; j < N; j++)
+                m[i][j] = mat[i * N + j];
+    }
+
     template <class... Args>
     __host__ __device__ SquareMatrix(float v, Args... args)
     {

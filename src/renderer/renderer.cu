@@ -3,6 +3,13 @@
 ImageRenderer::ImageRenderer(int _w, int _h, shared_ptr<Scene> _scene, string _filename)
     : width(_w), height(_h), scene(_scene), filename(_filename)
 {
+    // PBRTParser parser("../../data/data/cornell-box/scene-v4.pbrt");
+    PBRTParser parser("../../data/data/bathroom2/scene-v4.pbrt");
+    parser.parse();
+    scene = parser.get_scene();
+    width = parser.width;
+    height = parser.height;
+
     film = make_shared<Film>(width, height);
 }
 
@@ -37,6 +44,13 @@ void ImageRenderer::run()
 InteractiveRenderer::InteractiveRenderer(int _w, int _h, shared_ptr<Scene> _scene)
     : width(_w), height(_h), scene(_scene)
 {
+    // PBRTParser parser("../../data/data/cornell-box/scene-v4.pbrt");
+    PBRTParser parser("../../data/data/bedroom/scene-v4.pbrt");
+    parser.parse();
+    scene = parser.get_scene();
+    width = parser.width;
+    height = parser.height;
+
     film = make_shared<Film>(width, height);
     gui = make_shared<GUI>(width, height, scene->camera);
 }
@@ -58,7 +72,7 @@ void InteractiveRenderer::load_processes_from_config(const json& config)
 
 void InteractiveRenderer::run()
 {
-    while(!gui->should_close())
+    while (!gui->should_close())
     {
         gui->begin_frame();
 

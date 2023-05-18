@@ -22,6 +22,8 @@ public:
     void set_texture(int _t) { texture_id = _t; }
 
     void compute_aabb();
+    void load_from_ply(const string& filename);
+    void load_from_others(const string& filename);
     void load_from_file(const string& filename);
     void load_from_triangles(const vector<float3>& _v, const vector<uint3>& _i, const vector<float3>& _n, const vector<float2>& _t);
 };
