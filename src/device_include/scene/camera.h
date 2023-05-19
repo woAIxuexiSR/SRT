@@ -142,12 +142,14 @@ public:
         case Mode::Perspective:
         {
             float3 dir = normalize(make_float3((x - 0.5f) * nw, (y - 0.5f) * nh, 1.0f));
-            return controller.to_world(Ray(make_float3(0.0f), dir));
+            Ray ray = controller.to_world(Ray(make_float3(0.0f), dir));
+            return ray;
         }
         case Mode::Orthographic:
         {
             float3 pos = make_float3((x - 0.5f) * scale * aspect, (y - 0.5f) * scale, 0.0f);
-            return controller.to_world(Ray(pos, make_float3(0.0f, 0.0f, 1.0f)));
+            Ray ray = controller.to_world(Ray(pos, make_float3(0.0f, 0.0f, 1.0f)));
+            return ray;
         }
         case Mode::ThinLens:
         {

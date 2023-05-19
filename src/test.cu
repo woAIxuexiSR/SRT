@@ -2,53 +2,33 @@
 #include "renderer.h"
 #include "profiler.h"
 
-class A
+__global__ void kernel(int num, Ray* ray, int width, int height, Camera camera)
 {
-public:
-    int a;
-
-public:
-    friend void to_json(json& j, const A& a)
-    {
-        j = json{ {"a", a.a} };
-    }
-
-    friend void from_json(const json& j, A& a)
-    {
-        cout << "a" << endl;
-        j.at("a").get_to(a.a);
-    }
-};
-
-class B : public A
-{
-public:
-    int b { 0};
-
-public:
-    friend void to_json(json& j, const B& b)
-    {
-        j = json{ {"a", b.a}, {"b", b.b} };
-    }
-
-    friend void from_json(const json& j, B& b)
-    {
-        cout << "b" << endl;
-        j.at("a").get_to(b.a);
-        j.at("b").get_to(b.b);
-    }
-};
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (idx >= num) return;
+    float xx = (idx % width) / (float)width;
+    float yy = (idx / width) / (float)height;
+    // for (int i = 0; i < 128; i++)
+    //     ray[idx] = camera.get_ray(xx, yy);
+}
 
 int main()
 {
-    json config = { { "a" , 2 }, {"b", 3} };
+    int width = 1920, height = 1080;
+    int num = width * height;
+    Ray* ray;
+    checkCudaErrors(cudaMallocManaged(&ray, sizeof(Ray) * num));
+    Camera camera;
+    camera.set_aspect_fov((float)width / (float)height, 90.0f);
 
-    shared_ptr<A> a = make_shared<B>(config);
+    TICK(test);
 
-    json t = config["c"];
-    int c = !t.is_null() ? t.value("c", 1) : 1;
-    cout << t << endl;
-    cout << c << endl;
+    int block = 256;
+    int grid = (num + block - 1) / block;
+    kernel << <grid, block >> > (num, ray, width, height, camera);
+    checkCudaErrors(cudaDeviceSynchronize());
+
+    TOCK(test);
 
 
     return 0;

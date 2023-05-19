@@ -52,7 +52,7 @@ struct HitgroupData
 
     int mesh_id;
     int light_id;
-    Material mat;
+    Material* mat;
     bool has_texture;
     cudaTextureObject_t texture;
 };

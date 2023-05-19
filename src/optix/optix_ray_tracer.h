@@ -30,6 +30,7 @@ protected:
     vector<GPUMemory<uint3> > index_buffer;
     vector<GPUMemory<float3> > normal_buffer;
     vector<GPUMemory<float2> > texcoord_buffer;
+    GPUMemory<Material> material_buffer;
 
     OptixTraversableHandle traversable;
     GPUMemory<unsigned char> as_buffer;

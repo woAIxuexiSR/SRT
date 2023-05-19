@@ -30,8 +30,8 @@ extern "C" __global__ void __closesthit__radiance()
     HitInfo& prd = *(HitInfo*)getPRD<HitInfo>();
     prd.hit = true;
     prd.pos = v0 * (1.0f - uv.x - uv.y) + v1 * uv.x + v2 * uv.y;
-    prd.mat = &sbtData.mat;
-    prd.color = sbtData.mat.get_color();
+    prd.mat = sbtData.mat;
+    prd.color = sbtData.mat->get_color();
 
     float3 norm;
     if (sbtData.normal)

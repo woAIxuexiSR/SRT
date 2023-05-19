@@ -4,11 +4,11 @@ ImageRenderer::ImageRenderer(int _w, int _h, shared_ptr<Scene> _scene, string _f
     : width(_w), height(_h), scene(_scene), filename(_filename)
 {
     // PBRTParser parser("../../data/data/cornell-box/scene-v4.pbrt");
-    PBRTParser parser("../../data/data/bathroom2/scene-v4.pbrt");
-    parser.parse();
-    scene = parser.get_scene();
-    width = parser.width;
-    height = parser.height;
+    // PBRTParser parser("../../data/data/bathroom2/scene-v4.pbrt");
+    // parser.parse();
+    // scene = parser.get_scene();
+    // width = parser.width;
+    // height = parser.height;
 
     film = make_shared<Film>(width, height);
 }
@@ -45,11 +45,11 @@ InteractiveRenderer::InteractiveRenderer(int _w, int _h, shared_ptr<Scene> _scen
     : width(_w), height(_h), scene(_scene)
 {
     // PBRTParser parser("../../data/data/cornell-box/scene-v4.pbrt");
-    PBRTParser parser("../../data/data/bedroom/scene-v4.pbrt");
-    parser.parse();
-    scene = parser.get_scene();
-    width = parser.width;
-    height = parser.height;
+    // PBRTParser parser("../../data/data/bedroom/scene-v4.pbrt");
+    // parser.parse();
+    // scene = parser.get_scene();
+    // width = parser.width;
+    // height = parser.height;
 
     film = make_shared<Film>(width, height);
     gui = make_shared<GUI>(width, height, scene->camera);

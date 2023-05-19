@@ -30,8 +30,8 @@ void Denoise::resize(int _w, int _h)
     denoiser_state.resize(denoiser_sizes.stateSizeInBytes);
     denoiser_scratch.resize(denoiser_sizes.withoutOverlapScratchSizeInBytes);
     OPTIX_CHECK(optixDenoiserSetup(
-        denoiser, 
-        stream, 
+        denoiser,
+        stream,
         width, height,
         (CUdeviceptr)denoiser_state.data(),
         denoiser_sizes.stateSizeInBytes,
@@ -42,12 +42,12 @@ void Denoise::resize(int _w, int _h)
 
 Denoise::~Denoise()
 {
-    if(denoiser) OPTIX_CHECK(optixDenoiserDestroy(denoiser));
+    if (denoiser) OPTIX_CHECK(optixDenoiserDestroy(denoiser));
 }
 
 void Denoise::render(shared_ptr<Film> film)
 {
-    if(!enable) return;
+    if (!enable) return;
 
     OptixImage2D input_layer;
     input_layer.data = (CUdeviceptr)film->get_pixels();
@@ -102,5 +102,9 @@ void Denoise::render(shared_ptr<Film> film)
 
 void Denoise::render_ui()
 {
-    ImGui::Checkbox("Denoise", &enable);
+    ImGui::ShowDemoWindow();
+
+    if (ImGui::CollapsingHeader("Denoise"))
+        if (ImGui::TreeNode("Denoise##2"))
+            ImGui::Checkbox("Denoise", &enable);
 }

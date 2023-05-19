@@ -510,6 +510,11 @@ void OptixRayTracer::create_light()
 
 void OptixRayTracer::build_sbt()
 {
+    vector<Material> materials;
+    for (auto& m : scene->materials)
+        materials.push_back(*m);
+    material_buffer.resize_and_copy_from_host(materials);
+
     sbts.resize(module_pgs.size());
     raygen_sbt.resize(module_pgs.size());
     miss_sbt.resize(module_pgs.size());
@@ -549,7 +554,9 @@ void OptixRayTracer::build_sbt()
                 hitgroup_record.data.texcoord = (float2*)texcoord_buffer[k].data();
                 hitgroup_record.data.mesh_id = k;
                 hitgroup_record.data.light_id = meshid_to_lightid[k];
-                hitgroup_record.data.mat = *(scene->materials[scene->meshes[k]->material_id]);
+                // hitgroup_record.data.mat = *(scene->materials[scene->meshes[k]->material_id]);
+                hitgroup_record.data.mat = material_buffer.data() + scene->meshes[k]->material_id;
+
                 if (scene->meshes[k]->texture_id >= 0)
                 {
                     hitgroup_record.data.has_texture = true;

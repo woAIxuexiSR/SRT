@@ -10,7 +10,7 @@
                 "name": "PathTracer",
                 "params": {
                     "max_depth": 5,
-                    "samples_per_pixel": 4
+                    "samples_per_pixel": 1024
                 }
             },
             {
@@ -19,7 +19,7 @@
                 "params": {}
             },
             {
-                "enable": true,
+                "enable": false,
                 "name": "Denoise",
                 "params": {}
             },
