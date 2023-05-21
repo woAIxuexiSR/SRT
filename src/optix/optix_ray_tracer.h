@@ -15,6 +15,9 @@
 class OptixRayTracer
 {
 protected:
+    // scene
+    shared_ptr<Scene> scene;
+
     // context
     CUstream stream;
     OptixDeviceContext context;
@@ -24,20 +27,9 @@ protected:
     OptixPipelineCompileOptions pipeline_compile_options;
     vector<OptixPipeline> pipelines;
 
-    // scene
-    shared_ptr<Scene> scene;
-    vector<GPUMemory<float3> > vertex_buffer;
-    vector<GPUMemory<uint3> > index_buffer;
-    vector<GPUMemory<float3> > normal_buffer;
-    vector<GPUMemory<float2> > texcoord_buffer;
-    GPUMemory<Material> material_buffer;
-
+    // traversable
     OptixTraversableHandle traversable;
     GPUMemory<unsigned char> as_buffer;
-
-    // texture
-    vector<cudaArray_t> texture_arrays;
-    vector<cudaTextureObject_t> texture_objects;
 
     // sbt
     vector<OptixShaderBindingTable> sbts;
@@ -45,33 +37,17 @@ protected:
     vector<GPUMemory<MissSBTRecord> > miss_sbt;
     vector<GPUMemory<HitgroupSBTRecord> > hitgroup_sbt;
 
-    // light
-    Light light;
-    
-    GPUMemory<DiffuseAreaLight> light_buffer;
-    vector<GPUMemory<float> > light_area_buffer;
-    vector<int> meshid_to_lightid;
-
-    GPUMemory<EnvironmentLight> environment_buffer;
-    cudaArray_t environment_map_array;
-    cudaTextureObject_t environment_map;
-
 private:
     void init_optix();
     void create_context();
     void create_module(const string& ptx);
     void create_pipeline(const vector<string>& ptxs);
     void build_as();
-    void create_textures();
-    void create_environment_map();
-    void create_light();
     void build_sbt();
 
 public:
     OptixRayTracer(const vector<string>& _ptxfiles, shared_ptr<Scene> _scene);
-
     OptixTraversableHandle get_traversable() const { return traversable; }
-    Light get_light() const { return light; }
 
 
     template<class T>

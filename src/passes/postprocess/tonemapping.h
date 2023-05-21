@@ -1,6 +1,6 @@
 #pragma once
 
-#include "process.h"
+#include "renderpass.h"
 #include "helper_cuda.h"
 #include "my_math.h"
 
@@ -13,10 +13,10 @@ enum class ToneMappingType
     ACES
 };
 
-class ToneMapping : public RenderProcess
+class ToneMapping : public RenderPass
 {
 private:
-    REGISTER_RENDER_PROCESS(ToneMapping);
+    REGISTER_RENDER_PASS(ToneMapping);
 
     ToneMappingType type{ ToneMappingType::None };
     float exposure{ 0.0f };

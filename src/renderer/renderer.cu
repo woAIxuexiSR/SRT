@@ -13,18 +13,18 @@ ImageRenderer::ImageRenderer(int _w, int _h, shared_ptr<Scene> _scene, string _f
     film = make_shared<Film>(width, height);
 }
 
-void ImageRenderer::load_processes_from_config(const json& config)
+void ImageRenderer::load_passes_from_config(const json& config)
 {
     for (auto& c : config)
     {
         string name = c.at("name");
 
-        shared_ptr<RenderProcess> process = RenderProcessFactory::create_process(name, c["params"]);
+        shared_ptr<RenderPass> process = RenderPassFactory::create_pass(name, c["params"]);
         process->set_enable(c.at("enable"));
         process->resize(width, height);
         process->set_scene(scene);
 
-        processes.push_back(process);
+        passes.push_back(process);
     }
 }
 
@@ -32,7 +32,7 @@ void ImageRenderer::run()
 {
     PROFILE("Render");
 
-    for (auto process : processes)
+    for (auto process : passes)
         process->render(film);
     film->save(filename);
 
@@ -55,18 +55,18 @@ InteractiveRenderer::InteractiveRenderer(int _w, int _h, shared_ptr<Scene> _scen
     gui = make_shared<GUI>(width, height, scene->camera);
 }
 
-void InteractiveRenderer::load_processes_from_config(const json& config)
+void InteractiveRenderer::load_passes_from_config(const json& config)
 {
     for (auto& c : config)
     {
         string name = c.at("name");
 
-        shared_ptr<RenderProcess> process = RenderProcessFactory::create_process(name, c["params"]);
+        shared_ptr<RenderPass> process = RenderPassFactory::create_pass(name, c["params"]);
         process->set_enable(c.at("enable"));
         process->resize(width, height);
         process->set_scene(scene);
 
-        processes.push_back(process);
+        passes.push_back(process);
     }
 }
 
@@ -77,7 +77,7 @@ void InteractiveRenderer::run()
         gui->begin_frame();
 
         scene->render_ui();
-        for (auto process : processes)
+        for (auto process : passes)
         {
             process->render(film);
             process->render_ui();

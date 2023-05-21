@@ -143,7 +143,7 @@ GUI::GUI(int _w, int _h, shared_ptr<Camera> _c, int n)
             }
             float cursor_speed = 0.04f;
             float xoffset = (ud->last_x - static_cast<float>(x)) * cursor_speed;
-            float yoffset = (ud->last_y - static_cast<float>(y)) * cursor_speed;
+            float yoffset = (static_cast<float>(y) - ud->last_y) * cursor_speed;
             ud->last_x = static_cast<float>(x);
             ud->last_y = static_cast<float>(y);
             ud->camera->process_mouse_input(xoffset, yoffset);
@@ -276,6 +276,7 @@ void GUI::end_frame()
 
     ImGui::Render();
 
+    user_data.camera->moved = false;
     process_input();
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);

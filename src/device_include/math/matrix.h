@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cuda_runtime.h>
-#include <thrust/optional.h>
 
 template <int N>
 __host__ __device__ inline void init(float m[N][N], int i, int j) {}
@@ -93,6 +92,15 @@ public:
         return m[i];
     }
 
+    __host__ __device__ bool operator==(const SquareMatrix& other) const
+    {
+        for(int i = 0; i < N; i++)
+            for(int j = 0; j < N; j++)
+                if(m[i][j] != other.m[i][j])
+                    return false;
+        return true;
+    }
+
     __host__ __device__ SquareMatrix operator+(const SquareMatrix& other) const
     {
         SquareMatrix res;
@@ -167,6 +175,15 @@ __host__ __device__ inline SquareMatrix<N> Transpose(const SquareMatrix<N>& m)
     return t;
 }
 
+template<int N>
+__host__ __device__ inline float Trace(const SquareMatrix<N>& m)
+{
+    float trace = 0;
+    for (int i = 0; i < N; i++)
+        trace += m[i][i];
+    return trace;
+}
+
 __host__ __device__ inline float Determinant(const SquareMatrix<2>& m)
 {
     return m[0][0] * m[1][1] - m[0][1] * m[1][0];
@@ -195,11 +212,11 @@ __host__ __device__ inline float Determinant(const SquareMatrix<4>& m)
                       m[1][2] * (m[2][0] * m[3][1] - m[2][1] * m[3][0]));
 }
 
-__host__ __device__ inline thrust::optional<SquareMatrix<2> > Inverse(const SquareMatrix<2>& m)
+__host__ __device__ inline SquareMatrix<2> Inverse(const SquareMatrix<2>& m)
 {
     float det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
     if(det == 0)
-        return thrust::nullopt;
+        return SquareMatrix<2>::Zero();
 
     float invDet = 1.0f / det;
     SquareMatrix<2> inv;
@@ -209,9 +226,10 @@ __host__ __device__ inline thrust::optional<SquareMatrix<2> > Inverse(const Squa
     inv[1][1] = m[0][0] * invDet;
 
     return inv;
+    
 }
 
-__host__ __device__ inline thrust::optional<SquareMatrix<3> > Inverse(const SquareMatrix<3>& m)
+__host__ __device__ inline SquareMatrix<3> Inverse(const SquareMatrix<3>& m)
 {
     float adj00 = m[1][1] * m[2][2] - m[1][2] * m[2][1];
     float adj01 = m[1][2] * m[2][0] - m[1][0] * m[2][2];
@@ -219,7 +237,7 @@ __host__ __device__ inline thrust::optional<SquareMatrix<3> > Inverse(const Squa
 
     float det = m[0][0] * adj00 + m[0][1] * adj01 + m[0][2] * adj02;
     if(det == 0)
-        return thrust::nullopt;
+        return SquareMatrix<3>::Zero();
     
     float invDet = 1.0f / det;
     SquareMatrix<3> inv;
@@ -237,7 +255,7 @@ __host__ __device__ inline thrust::optional<SquareMatrix<3> > Inverse(const Squa
 }
 
 
-__host__ __device__ inline thrust::optional<SquareMatrix<4> > Inverse(const SquareMatrix<4>& m)
+__host__ __device__ inline SquareMatrix<4> Inverse(const SquareMatrix<4>& m)
 {
     // split into 2x2
     float s0 = m[0][0] * m[1][1] - m[0][1] * m[1][0];
@@ -256,7 +274,7 @@ __host__ __device__ inline thrust::optional<SquareMatrix<4> > Inverse(const Squa
 
     float det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
     if(det == 0)
-        return thrust::nullopt;
+        return SquareMatrix<4>::Zero();
     
     float invDet = 1.0f / det;
     float inv[4][4] = {

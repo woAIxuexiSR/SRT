@@ -1,0 +1,23 @@
+{
+    "render": {
+        "type": "image",
+        "output": "output.png"
+    },
+    "passes": [
+        {
+            "name": "PathTracer",
+            "enable": true,
+            "params": {
+                "max_depth": 5,
+                "sample_per_pixel": 128,
+                "use_nee": true
+            }
+        }
+    ],
+    "scene": {
+        "model": {
+            "type": "pbrt",
+            "path": "scene.pbrt"
+        }
+    }
+}

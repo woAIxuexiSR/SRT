@@ -10,7 +10,6 @@ private:
     int width, height;
     GPUMemory<float4> pixels;
 
-
     void save_ldr(const string& filename) const;
     void save_exr(const string& filename) const;
 

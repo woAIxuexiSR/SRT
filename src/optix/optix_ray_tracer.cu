@@ -207,11 +207,7 @@ void OptixRayTracer::create_pipeline(const vector<string>& ptxs)
 void OptixRayTracer::build_as()
 {
     int mesh_num = (int)scene->meshes.size();
-
-    vertex_buffer.resize(mesh_num);
-    index_buffer.resize(mesh_num);
-    normal_buffer.resize(mesh_num);
-    texcoord_buffer.resize(mesh_num);
+    DeviceSceneData& d_scene = scene->d_scene;
 
     vector<OptixBuildInput> triangle_input(mesh_num);
     vector<CUdeviceptr> d_vertices(mesh_num);
@@ -220,28 +216,20 @@ void OptixRayTracer::build_as()
 
     for (int i = 0; i < mesh_num; i++)
     {
-        TriangleMesh& mesh = *(scene->meshes[i]);
-        vertex_buffer[i].resize_and_copy_from_host(mesh.vertices);
-        index_buffer[i].resize_and_copy_from_host(mesh.indices);
-        if (!mesh.normals.empty())
-            normal_buffer[i].resize_and_copy_from_host(mesh.normals);
-        if (!mesh.texcoords.empty())
-            texcoord_buffer[i].resize_and_copy_from_host(mesh.texcoords);
-
         triangle_input[i] = {};
         triangle_input[i].type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
-        d_vertices[i] = (CUdeviceptr)vertex_buffer[i].data();
-        d_indices[i] = (CUdeviceptr)index_buffer[i].data();
+        d_vertices[i] = (CUdeviceptr)d_scene.vertex_buffer[i].data();
+        d_indices[i] = (CUdeviceptr)d_scene.index_buffer[i].data();
 
         triangle_input[i].triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
         triangle_input[i].triangleArray.vertexStrideInBytes = sizeof(float3);
-        triangle_input[i].triangleArray.numVertices = (unsigned)mesh.vertices.size();
+        triangle_input[i].triangleArray.numVertices = (unsigned)scene->meshes[i]->vertices.size();
         triangle_input[i].triangleArray.vertexBuffers = &d_vertices[i];
 
         triangle_input[i].triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
         triangle_input[i].triangleArray.indexStrideInBytes = sizeof(int3);
-        triangle_input[i].triangleArray.numIndexTriplets = (unsigned)mesh.indices.size();
+        triangle_input[i].triangleArray.numIndexTriplets = (unsigned)scene->meshes[i]->indices.size();
         triangle_input[i].triangleArray.indexBuffer = d_indices[i];
 
         triangle_input_flags[i] = OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT;
@@ -305,220 +293,14 @@ void OptixRayTracer::build_as()
     checkCudaErrors(cudaDeviceSynchronize());
 }
 
-void OptixRayTracer::create_textures()
-{
-    int num_textures = (int)scene->textures.size();
-
-    texture_arrays.resize(num_textures);
-    texture_objects.resize(num_textures);
-
-    for (int i = 0; i < num_textures; i++)
-    {
-        Texture& texture = *(scene->textures[i]);
-
-        cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<uchar4>();
-        int width = texture.resolution.x;
-        int height = texture.resolution.y;
-        int pitch = width * sizeof(uchar4);
-        if (texture.format == Texture::Format::Float)
-        {
-            channel_desc = cudaCreateChannelDesc<float4>();
-            pitch = width * sizeof(float4);
-        }
-
-        cudaArray_t& pixel_array = texture_arrays[i];
-        checkCudaErrors(cudaMallocArray(&pixel_array, &channel_desc, width, height));
-        checkCudaErrors(cudaMemcpy2DToArray(pixel_array, 0, 0, texture.get_pixels(), pitch, pitch, height, cudaMemcpyHostToDevice));
-
-        cudaResourceDesc res_desc = {};
-        res_desc.resType = cudaResourceTypeArray;
-        res_desc.res.array.array = pixel_array;
-
-        cudaTextureDesc tex_desc = {};
-        tex_desc.addressMode[0] = cudaAddressModeWrap;
-        tex_desc.addressMode[1] = cudaAddressModeWrap;
-        tex_desc.filterMode = cudaFilterModeLinear;
-        tex_desc.readMode = cudaReadModeNormalizedFloat;
-        if (texture.format == Texture::Format::Float)
-            tex_desc.readMode = cudaReadModeElementType;
-        tex_desc.normalizedCoords = 1;
-        tex_desc.maxAnisotropy = 1;
-        tex_desc.maxMipmapLevelClamp = 99;
-        tex_desc.minMipmapLevelClamp = 0;
-        tex_desc.mipmapFilterMode = cudaFilterModePoint;
-        tex_desc.borderColor[0] = 1.0f;
-        tex_desc.sRGB = 0;
-
-        checkCudaErrors(cudaCreateTextureObject(&texture_objects[i], &res_desc, &tex_desc, nullptr));
-    }
-}
-
-void OptixRayTracer::create_environment_map()
-{
-    if (scene->environment_map.empty())
-        return;
-    int num = scene->environment_map.size();
-    assert(num == 1 || num == 6);
-
-    int width = scene->environment_map[0]->resolution.x;
-    int height = scene->environment_map[0]->resolution.y;
-
-    Texture::Format format = scene->environment_map[0]->format;
-    if (num == 1)
-    {
-        cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<uchar4>();
-        int pitch = width * sizeof(uchar4);
-        if (format == Texture::Format::Float)
-        {
-            channel_desc = cudaCreateChannelDesc<float4>();
-            pitch = width * sizeof(float4);
-        }
-        checkCudaErrors(cudaMallocArray(&environment_map_array, &channel_desc, width, height));
-        checkCudaErrors(cudaMemcpy2DToArray(environment_map_array, 0, 0, scene->environment_map[0]->get_pixels(), pitch, pitch, height, cudaMemcpyHostToDevice));
-    }
-    else
-    {
-        cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<uchar4>();
-        int pitch = width * sizeof(uchar4);
-        if (format == Texture::Format::Float)
-        {
-            channel_desc = cudaCreateChannelDesc<float4>();
-            pitch = width * sizeof(float4);
-        }
-        int channel = 6;
-        cudaExtent extent = make_cudaExtent(width, height, channel);
-        checkCudaErrors(cudaMalloc3DArray(&environment_map_array, &channel_desc, extent, cudaArrayCubemap));
-
-        vector<unsigned char> tex_data(pitch * height * channel);
-        for (int i = 0; i < 6; i++)
-            memcpy(tex_data.data() + i * pitch * height, scene->environment_map[i]->get_pixels(), pitch * height);
-
-
-        cudaMemcpy3DParms copy_params = { 0 };
-        copy_params.srcPtr = make_cudaPitchedPtr(tex_data.data(), pitch, width, height);
-        copy_params.dstArray = environment_map_array;
-        copy_params.extent = extent;
-        copy_params.kind = cudaMemcpyHostToDevice;
-        checkCudaErrors(cudaMemcpy3D(&copy_params));
-    }
-
-    cudaResourceDesc res_desc = {};
-    res_desc.resType = cudaResourceTypeArray;
-    res_desc.res.array.array = environment_map_array;
-
-    cudaTextureDesc tex_desc = {};
-    tex_desc.addressMode[0] = cudaAddressModeWrap;
-    tex_desc.addressMode[1] = cudaAddressModeWrap;
-    tex_desc.addressMode[2] = cudaAddressModeWrap;
-    tex_desc.filterMode = cudaFilterModeLinear;
-    tex_desc.readMode = cudaReadModeNormalizedFloat;
-    if (format == Texture::Format::Float)
-        tex_desc.readMode = cudaReadModeElementType;
-    tex_desc.normalizedCoords = 1;
-    tex_desc.maxAnisotropy = 1;
-    tex_desc.maxMipmapLevelClamp = 99;
-    tex_desc.minMipmapLevelClamp = 0;
-    tex_desc.mipmapFilterMode = cudaFilterModePoint;
-    tex_desc.borderColor[0] = 1.0f;
-    tex_desc.sRGB = 0;
-
-    checkCudaErrors(cudaCreateTextureObject(&environment_map, &res_desc, &tex_desc, nullptr));
-}
-
-void OptixRayTracer::create_light()
-{
-    int mesh_num = (int)scene->meshes.size();
-
-    meshid_to_lightid.resize(mesh_num);
-    int cnt = 0;
-    for (int i = 0; i < mesh_num; i++)
-    {
-        meshid_to_lightid[i] = -1;
-        TriangleMesh& mesh = *(scene->meshes[i]);
-        if (!scene->materials[mesh.material_id]->is_emissive())
-            continue;
-
-        meshid_to_lightid[i] = cnt;
-        cnt++;
-    }
-
-    // build area lights
-    vector<DiffuseAreaLight> area_lights(cnt);
-    light_area_buffer.resize(cnt);
-    float weight_sum = 0.0f;
-    for (int i = 0; i < mesh_num; i++)
-    {
-        if (meshid_to_lightid[i] < 0)
-            continue;
-
-        TriangleMesh& mesh = *(scene->meshes[i]);
-        int idx = meshid_to_lightid[i];
-
-        area_lights[idx].vertices = vertex_buffer[i].data();
-        area_lights[idx].indices = index_buffer[i].data();
-        area_lights[idx].normals = normal_buffer[i].data();
-        area_lights[idx].texcoords = texcoord_buffer[i].data();
-        if (mesh.texture_id >= 0)
-            area_lights[idx].texture = texture_objects[mesh.texture_id];
-
-        area_lights[idx].emission_color = scene->materials[mesh.material_id]->get_emission_color();
-        area_lights[idx].intensity = scene->materials[mesh.material_id]->get_intensity();
-
-        int face_num = (int)mesh.indices.size();
-        vector<float> areas(face_num);
-        float area_sum = 0.0f;
-        for (int j = 0; j < face_num; j++)
-        {
-            uint3& index = mesh.indices[j];
-            float3 v0 = mesh.vertices[index.x];
-            float3 v1 = mesh.vertices[index.y];
-            float3 v2 = mesh.vertices[index.z];
-            areas[j] = 0.5f * length(cross(v1 - v0, v2 - v0));
-            area_sum += areas[j];
-        }
-        light_area_buffer[idx].resize_and_copy_from_host(areas);
-
-        area_lights[idx].face_num = face_num;
-        area_lights[idx].areas = light_area_buffer[idx].data();
-        area_lights[idx].area_sum = area_sum;
-
-        weight_sum += area_sum * area_lights[idx].intensity;
-    }
-    light_buffer.resize_and_copy_from_host(area_lights);
-
-    // build infinite light
-    EnvironmentLight elight;
-    elight.emission_color = scene->background;
-    if (scene->environment_map.size() == 1)
-    {
-        elight.type = EnvironmentLight::Type::UVMap;
-        elight.texture = environment_map;
-    }
-    else if (scene->environment_map.size() == 6)
-    {
-        elight.type = EnvironmentLight::Type::CubeMap;
-        elight.texture = environment_map;
-    }
-    environment_buffer.resize_and_copy_from_host(&elight, 1);
-
-    // merge lights
-    light.num = cnt;
-    light.lights = light_buffer.data();
-    light.weight_sum = weight_sum;
-    light.environment = environment_buffer.data();
-}
-
 void OptixRayTracer::build_sbt()
 {
-    vector<Material> materials;
-    for (auto& m : scene->materials)
-        materials.push_back(*m);
-    material_buffer.resize_and_copy_from_host(materials);
-
     sbts.resize(module_pgs.size());
     raygen_sbt.resize(module_pgs.size());
     miss_sbt.resize(module_pgs.size());
     hitgroup_sbt.resize(module_pgs.size());
+
+    DeviceSceneData& d_scene = scene->d_scene;
 
     for (int i = 0; i < module_pgs.size(); i++)
     {
@@ -548,19 +330,18 @@ void OptixRayTracer::build_sbt()
                 HitgroupSBTRecord hitgroup_record;
                 OPTIX_CHECK(optixSbtRecordPackHeader(module_pgs[i].hitgroupPGs[j], &hitgroup_record));
 
-                hitgroup_record.data.vertex = (float3*)vertex_buffer[k].data();
-                hitgroup_record.data.index = (uint3*)index_buffer[k].data();
-                hitgroup_record.data.normal = (float3*)normal_buffer[k].data();
-                hitgroup_record.data.texcoord = (float2*)texcoord_buffer[k].data();
+                hitgroup_record.data.vertex = (float3*)d_scene.vertex_buffer[k].data();
+                hitgroup_record.data.index = (uint3*)d_scene.index_buffer[k].data();
+                hitgroup_record.data.normal = (float3*)d_scene.normal_buffer[k].data();
+                hitgroup_record.data.texcoord = (float2*)d_scene.texcoord_buffer[k].data();
                 hitgroup_record.data.mesh_id = k;
-                hitgroup_record.data.light_id = meshid_to_lightid[k];
-                // hitgroup_record.data.mat = *(scene->materials[scene->meshes[k]->material_id]);
-                hitgroup_record.data.mat = material_buffer.data() + scene->meshes[k]->material_id;
+                hitgroup_record.data.light_id = d_scene.meshid_to_lightid[k];
+                hitgroup_record.data.mat = d_scene.material_buffer.data() + scene->meshes[k]->material_id;
 
                 if (scene->meshes[k]->texture_id >= 0)
                 {
                     hitgroup_record.data.has_texture = true;
-                    hitgroup_record.data.texture = texture_objects[scene->meshes[k]->texture_id];
+                    hitgroup_record.data.texture = d_scene.texture_objects[scene->meshes[k]->texture_id];
                 }
                 else
                     hitgroup_record.data.has_texture = false;
@@ -597,15 +378,6 @@ OptixRayTracer::OptixRayTracer(const vector<string>& _ptxfiles, shared_ptr<Scene
 
     cout << "Building acceleration structure..." << endl;
     build_as();
-
-    cout << "Creating textures..." << endl;
-    create_textures();
-
-    cout << "Creating environment map..." << endl;
-    create_environment_map();
-
-    cout << "Creating light..." << endl;
-    create_light();
 
     cout << "Building shader binding table..." << endl;
     build_sbt();

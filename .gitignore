@@ -1,4 +1,5 @@
 .vscode
 .editorconfig
 build
+config
 data

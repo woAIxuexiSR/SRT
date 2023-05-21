@@ -1,6 +1,6 @@
 #include "denoise.h"
 
-REGISTER_RENDER_PROCESS_CPP(Denoise);
+REGISTER_RENDER_PASS_CPP(Denoise);
 
 Denoise::Denoise() : intensity(1)
 {

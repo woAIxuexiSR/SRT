@@ -1,13 +1,13 @@
 #pragma once
 
-#include "process.h"
+#include "renderpass.h"
 #include "optix_ray_tracer.h"
 #include "my_params.h"
 
-class PathTracer : public RenderProcess
+class PathTracer : public RenderPass
 {
 private:
-    REGISTER_RENDER_PROCESS(PathTracer);
+    REGISTER_RENDER_PASS(PathTracer);
 
     shared_ptr<OptixRayTracer> tracer;
     int max_depth{ 16 };

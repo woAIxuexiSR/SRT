@@ -21,14 +21,10 @@ int main()
     Camera camera;
     camera.set_aspect_fov((float)width / (float)height, 90.0f);
 
-    TICK(test);
-
     int block = 256;
     int grid = (num + block - 1) / block;
     kernel << <grid, block >> > (num, ray, width, height, camera);
     checkCudaErrors(cudaDeviceSynchronize());
-
-    TOCK(test);
 
 
     return 0;

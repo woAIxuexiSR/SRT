@@ -7,7 +7,7 @@
 #include "profiler.h"
 #include <functional>
 
-class RenderProcess
+class RenderPass
 {
 protected:
     bool enable;
@@ -15,7 +15,7 @@ protected:
     shared_ptr<Scene> scene = nullptr;
 
 public:
-    RenderProcess() {}
+    RenderPass() {}
 
     virtual void set_enable(bool _enable) { enable = _enable; }
     virtual void resize(int _w, int _h) { width = _w; height = _h; }
@@ -26,10 +26,10 @@ public:
 };
 
 
-class RenderProcessFactory
+class RenderPassFactory
 {
 private:
-    using map_type = unordered_map<string, std::function<shared_ptr<RenderProcess>(const json&)> >;
+    using map_type = unordered_map<string, std::function<shared_ptr<RenderPass>(const json&)> >;
 
 public:
     static map_type& get_map()
@@ -48,29 +48,29 @@ public:
         }
     };
 
-    static shared_ptr<RenderProcess> create_process(const string& name, const json& params)
+    static shared_ptr<RenderPass> create_pass(const string& name, const json& params)
     {
         auto& map = get_map();
         auto it = map.find(name);
         if (it == map.end())
         {
-            cout << "ERROR::Render Process " << name << " not found!" << endl;
+            cout << "ERROR::Render pass " << name << " not found!" << endl;
             return nullptr;
         }
         return it->second(params);
     }
 
-    static void print_registered_processes()
+    static void print_registered_pass()
     {
         auto& map = get_map();
-        cout << "Registered Render Processes:" << endl;
+        cout << "Registered Render Pass:" << endl;
         for (auto& it : map)
             cout << "    " << it.first << endl;
     }
 };
 
-#define REGISTER_RENDER_PROCESS(T) \
-    static RenderProcessFactory::Register<T> reg
+#define REGISTER_RENDER_PASS(T) \
+    static RenderPassFactory::Register<T> reg
 
-#define REGISTER_RENDER_PROCESS_CPP(T) \
-    RenderProcessFactory::Register<T> T::reg(#T)
+#define REGISTER_RENDER_PASS_CPP(T) \
+    RenderPassFactory::Register<T> T::reg(#T)

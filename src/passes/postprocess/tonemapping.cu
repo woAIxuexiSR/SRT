@@ -1,6 +1,6 @@
 #include "tonemapping.h"
 
-REGISTER_RENDER_PROCESS_CPP(ToneMapping);
+REGISTER_RENDER_PASS_CPP(ToneMapping);
 
 void ToneMapping::render(shared_ptr<Film> film)
 {
@@ -23,7 +23,7 @@ void ToneMapping::render(shared_ptr<Film> film)
         }
         case ToneMappingType::Reinhard:
         {
-            float L = luminance(color);
+            float L = Luminance(color);
             color = color / (1.0f + L);
             break;
         }

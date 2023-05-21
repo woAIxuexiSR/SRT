@@ -19,7 +19,7 @@ public:
     __host__ __device__ const float* operator[](int i) const { return m[i]; }
     __host__ __device__ float* operator[](int i) { return m[i]; }
     __host__ __device__ Transform operator*(const Transform& other) const { return Transform(m * other.m); }
-    __host__ __device__ float3 translate() const { return make_float3(m[0][3], m[1][3], m[2][3]); }
+    __host__ __device__ bool operator==(const Transform& other) const { return m == other.m; }
 
     // apply transform
     __host__ __device__ float3 apply_point(float3 p) const
@@ -46,9 +46,7 @@ public:
     // static methods
     __host__ __device__ static Transform Inverse(const Transform& t)
     {
-        thrust::optional<SquareMatrix<4> > inv = ::Inverse(t.m);
-        if (inv) return Transform(inv.value());
-        return Transform();
+        return Transform(::Inverse(t.m));
     }
 
     __host__ __device__ static Transform Identity() { return Transform(); }

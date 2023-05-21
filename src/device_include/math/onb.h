@@ -2,17 +2,13 @@
 
 #include "helper_math.h"
 
-// orthonormal basis
 class Onb
 {
 private:
-
-public:
     float3 U, V, N;
 
-    __device__ Onb(): U({ 1, 0, 0 }), V({ 0, 1, 0 }), N({ 0, 0, 1 }) {}
-
-    __device__ Onb(float3 _u, float3 _v, float3 _n) : U(_u), V(_v), N(_n) {}
+public:
+    __device__ Onb() : U({ 1, 0, 0 }), V({ 0, 1, 0 }), N({ 0, 0, 1 }) {}
 
     __device__ Onb(float3 _n) : N(_n)
     {

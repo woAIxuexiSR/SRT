@@ -86,7 +86,7 @@ extern "C" __global__ void __raygen__()
     Light& light = params.extra.light;
 
     HitInfo info; int visible;
-    thrust::pair<unsigned, unsigned> u = pack_pointer(&info), v = pack_pointer(&visible);
+    uint2 u = pack_pointer(&info), v = pack_pointer(&visible);
 
     float3 result = make_float3(0.0f);
     for (int i = 0; i < params.extra.spp; i++)
@@ -104,7 +104,7 @@ extern "C" __global__ void __raygen__()
             optixTrace(params.traversable, ray.pos, ray.dir, 1e-3f, 1e16f, 0.0f,
                 OptixVisibilityMask(255), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
                 RADIANCE_RAY_TYPE, RAY_TYPE_COUNT, RADIANCE_RAY_TYPE,
-                u.first, u.second);
+                u.x, u.y);
 
             if (!info.hit)
             {
@@ -143,7 +143,7 @@ extern "C" __global__ void __raygen__()
                     optixTrace(params.traversable, shadow_ray.pos, shadow_ray.dir, 1e-3f, t - 1e-3f, 0.0f,
                         OptixVisibilityMask(255), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
                         SHADOW_RAY_TYPE, RAY_TYPE_COUNT, SHADOW_RAY_TYPE,
-                        v.first, v.second);
+                        v.x, v.y);
 
                     if (visible)
                     {

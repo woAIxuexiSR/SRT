@@ -54,6 +54,7 @@ __host__ inline float random_float()
     return d(g);
 }
 
+// [min, max)
 __host__ inline int random_int(int min, int max)
 {
     return min + random_float() * (max - min);

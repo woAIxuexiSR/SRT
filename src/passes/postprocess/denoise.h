@@ -1,14 +1,14 @@
 #pragma once
 
-#include "process.h"
+#include "renderpass.h"
 #include "helper_cuda.h"
 #include "helper_optix.h"
 #include "my_math.h"
 
-class Denoise : public RenderProcess
+class Denoise : public RenderPass
 {
 private:
-    REGISTER_RENDER_PROCESS(Denoise);
+    REGISTER_RENDER_PASS(Denoise);
 
     CUstream stream;
     OptixDeviceContext context;

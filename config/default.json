@@ -9,7 +9,7 @@
                 "enable": true,
                 "name": "PathTracer",
                 "params": {
-                    "max_depth": 5,
+                    "max_depth": 65,
                     "samples_per_pixel": 1024
                 }
             },

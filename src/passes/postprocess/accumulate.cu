@@ -1,6 +1,6 @@
 #include "accumulate.h"
 
-REGISTER_RENDER_PROCESS_CPP(Accumulate);
+REGISTER_RENDER_PASS_CPP(Accumulate);
 
 void Accumulate::resize(int _w, int _h)
 {

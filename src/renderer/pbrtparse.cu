@@ -180,7 +180,7 @@ void PBRTParser::load_material(const string& name, const string& type, const uno
         }
     }
 
-    material->type = MaterialType::Diffuse;
+    material->type = Material::Type::Diffuse;
     material_id = scene->add_material(material, name, texture_id);
 }
 
@@ -263,7 +263,7 @@ void PBRTParser::parse()
         else if (token == "WorldBegin")
         {
             // the former transform is the camera transform
-            camera->set_controller(CameraController::Type::FPS, transform);
+            camera->set_controller(transform, 1.0f);
             reset_state();
         }
         else if (token == "WorldEnd") {}

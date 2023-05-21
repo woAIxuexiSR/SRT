@@ -1,12 +1,12 @@
 #pragma once
 
-#include "process.h"
+#include "renderpass.h"
 #include "helper_cuda.h"
 
-class Accumulate : public RenderProcess
+class Accumulate : public RenderPass
 {
 private:
-    REGISTER_RENDER_PROCESS(Accumulate);
+    REGISTER_RENDER_PASS(Accumulate);
 
     int frame_count{ 0 };
     GPUMemory<float4> accumulated;

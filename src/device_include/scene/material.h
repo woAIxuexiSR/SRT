@@ -10,30 +10,25 @@
 // n : surface normal, always in the same hemisphere with wo
 // inner : whether wo is inside the surface
 
-enum class MaterialType
-{
-    Diffuse,
-    DiffuseTransmission,
-    Dielectric,
-    Disney
-};
-
 enum class ReflectionType
 {
     Diffuse,
+    Glossy,
     Specular
 };
 
 class MaterialSample
 {
 public:
-    ReflectionType type;  // reflection type
-    float3 f;           // BRDF
-    float3 wi;          // incoming direction
-    float pdf;          // pdf of wi
+    ReflectionType type;    // reflection type
+    float3 f;               // BRDF
+    float3 wi;              // incoming direction
+    float pdf;              // pdf of wi
 
+public:
     __device__ MaterialSample()
         : type(ReflectionType::Diffuse), f({ 0.0f, 0.0f, 0.0f }), wi({ 0.0f, 0.0f, 0.0f }), pdf(0.0f) {}
+
     __device__ MaterialSample(ReflectionType _t, float3 _f, float3 _wi, float _pdf)
         : type(_t), f(_f), wi(_wi), pdf(_pdf) {}
 };
@@ -75,7 +70,10 @@ Disney parameters:
 class Material
 {
 public:
-    MaterialType type{ MaterialType::Diffuse };
+    enum class Type { Diffuse, DiffuseTransmission, Dielectric, Disney };
+
+
+    Type type{ Type::Diffuse };
     float3 color{ 0.0f, 0.0f, 0.0f };
     float3 emission_color{ 0.0f, 0.0f, 0.0f };
     float intensity{ 0.0f };
@@ -89,12 +87,12 @@ public:
     __host__ __device__ float3 get_emission_color() const { return emission_color; }
     __host__ __device__ float get_intensity() const { return intensity; }
 
-    __host__ __device__ bool is_emissive() const { return length(emission_color) > 0.0f && intensity > 0.0f; }
-    __host__ __device__ bool is_specular() const { return type == MaterialType::Dielectric; }
+    __host__ __device__ bool is_emissive() const { return intensity > 0.0f && length(emission_color) > 0.0f; }
+    __host__ __device__ bool is_specular() const { return type == Type::Dielectric; }
     __host__ __device__ bool is_transmissive() const
     {
-        return (type == MaterialType::DiffuseTransmission) || (type == MaterialType::Dielectric)
-            || (type == MaterialType::Disney && params[11] > 0.0f);
+        return (type == Type::DiffuseTransmission) || (type == Type::Dielectric)
+            || (type == Type::Disney && params[11] > 0.0f);
     }
 
     __device__ float3 eval(float3 wi, float3 wo, float3 n, float3 tex_color, bool inner = false) const
@@ -102,24 +100,24 @@ public:
         switch (type)
         {
 
-        case MaterialType::Diffuse:
+        case Type::Diffuse:
         {
             if (dot(wi, n) <= 0.0f || dot(wo, n) <= 0.0f)
                 return { 0.0f, 0.0f, 0.0f };
             return M_1_PI * tex_color;
         }
 
-        case MaterialType::DiffuseTransmission:
+        case Type::DiffuseTransmission:
         {
             if (dot(wi, wo) <= 0.0f)
                 return M_1_PI * make_float3(params[0], params[1], params[2]);
             return M_1_PI * color;
         }
 
-        case MaterialType::Dielectric:
+        case Type::Dielectric:
             return { 0.0f, 0.0f, 0.0f };
 
-        case MaterialType::Disney:
+        case Type::Disney:
         {
             float ior = params[0], metallic = params[1], subsurface = params[2], roughness = max(params[3], 0.001f), specular = params[4], specularTint = params[5];
             float sheen = params[7], sheenTint = params[8], clearcoat = params[9], clearcoatGloss = max(params[10], 0.001f), specTrans = params[11];
@@ -131,7 +129,7 @@ public:
             if (H.z <= 0.0f) H = -H;
             float V_H = dot(V, H), L_H = dot(L, H);
 
-            float lum = luminance(tex_color);
+            float lum = Luminance(tex_color);
             float3 ctint = lum > 0.0f ? tex_color / lum : make_float3(1.0f);
             // float F0 = (1.0f - eta) / (1.0f + eta);
             // float3 spec_color = lerp(F0 * F0 * lerp(make_float3(1.0f), ctint, specularTint), tex_color, metallic);
@@ -140,7 +138,7 @@ public:
 
             float FM = fresnel_mix(metallic, eta, V_H);
             float diffuse_w = lum * (1.0f - metallic) * (1.0f - specTrans);
-            float spec_reflect_w = luminance(lerp(spec_color, make_float3(1.0f), FM));
+            float spec_reflect_w = Luminance(lerp(spec_color, make_float3(1.0f), FM));
             float spec_refract_w = (1.0f - FM) * (1.0f - metallic) * specTrans * lum;
             float clearcoat_w = clearcoat * (1.0f - metallic);
 
@@ -211,7 +209,7 @@ public:
         switch (type)
         {
 
-        case MaterialType::Diffuse:
+        case Type::Diffuse:
         {
             float3 v = cosine_sample_hemisphere(rnd);
             float pdf = cosine_hemisphere_pdf(v.z);
@@ -220,7 +218,7 @@ public:
             return { ReflectionType::Diffuse, eval(wi, wo, n, tex_color), wi, pdf };
         }
 
-        case MaterialType::DiffuseTransmission:
+        case Type::DiffuseTransmission:
         {
             float pr = max(color.x, max(color.y, color.z));
             float pt = max(params[0], max(params[1], params[2]));
@@ -245,7 +243,7 @@ public:
             }
         }
 
-        case MaterialType::Dielectric:
+        case Type::Dielectric:
         {
             float ior = params[0];
 
@@ -264,7 +262,7 @@ public:
                 return { ReflectionType::Specular, tex_color, normalize(wi), 1.0f };
         }
 
-        case MaterialType::Disney:
+        case Type::Disney:
         {
             float ior = params[0], metallic = params[1], roughness = max(params[3], 0.001f), specular = params[4], specularTint = params[5];
             float sheenTint = params[8], clearcoat = params[9], clearcoatGloss = max(params[10], 0.001f), specTrans = params[11];
@@ -273,14 +271,14 @@ public:
             Onb onb(n);
             float3 V = onb.to_local(wo);
 
-            float lum = luminance(tex_color);
+            float lum = Luminance(tex_color);
             float3 ctint = lum > 0.0f ? tex_color / lum : make_float3(1.0f);
             float3 spec_color = lerp(specular * 0.08f * lerp(make_float3(1.0f), ctint, specularTint), tex_color, metallic);
             float3 sheen_color = lerp(make_float3(1.0f), ctint, sheenTint);
 
             float FM = fresnel_mix(metallic, eta, V.z);
             float diffuse_w = lum * (1.0f - metallic) * (1.0f - specTrans);
-            float spec_reflect_w = luminance(lerp(spec_color, make_float3(1.0f), FM));
+            float spec_reflect_w = Luminance(lerp(spec_color, make_float3(1.0f), FM));
             float spec_refract_w = (1.0f - FM) * (1.0f - metallic) * specTrans * lum;
             float clearcoat_w = clearcoat * (1.0f - metallic);
 
@@ -358,10 +356,10 @@ public:
         switch (type)
         {
 
-        case MaterialType::Diffuse:
+        case Type::Diffuse:
             return cosine_hemisphere_pdf(dot(wi, n));
 
-        case MaterialType::DiffuseTransmission:
+        case Type::DiffuseTransmission:
         {
             float pr = max(color.x, max(color.y, color.z));
             float pt = max(params[0], max(params[1], params[2]));
@@ -372,10 +370,10 @@ public:
                 return (1.0f - reflection_ratio) * cosine_hemisphere_pdf(dot(wi, n));
         }
 
-        case MaterialType::Dielectric:
+        case Type::Dielectric:
             return 1.0f;
 
-        case MaterialType::Disney:
+        case Type::Disney:
         {
             float ior = params[0], metallic = params[1], roughness = max(params[3], 0.001f), specular = params[4], specularTint = params[5];
             float sheenTint = params[8], clearcoat = params[9], clearcoatGloss = max(params[10], 0.001f), specTrans = params[11];
@@ -388,14 +386,14 @@ public:
             float3 H_refract = normalize(L + V * eta);
             if (H_refract.z < 0.0f) H_refract = -H_refract;
 
-            float lum = luminance(tex_color);
+            float lum = Luminance(tex_color);
             float3 ctint = lum > 0.0f ? tex_color / lum : make_float3(1.0f);
             float3 spec_color = lerp(specular * 0.08f * lerp(make_float3(1.0f), ctint, specularTint), tex_color, metallic);
             float3 sheen_color = lerp(make_float3(1.0f), ctint, sheenTint);
 
             float FM = fresnel_mix(metallic, eta, V.z);
             float diffuse_w = lum * (1.0f - metallic) * (1.0f - specTrans);
-            float spec_reflect_w = luminance(lerp(spec_color, make_float3(1.0f), FM));
+            float spec_reflect_w = Luminance(lerp(spec_color, make_float3(1.0f), FM));
             float spec_refract_w = (1.0f - FM) * (1.0f - metallic) * specTrans * lum;
             float clearcoat_w = clearcoat * (1.0f - metallic);
 

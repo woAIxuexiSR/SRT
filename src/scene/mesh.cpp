@@ -8,6 +8,17 @@ void TriangleMesh::compute_aabb()
         aabb.expand(vertices[i]);
 }
 
+void TriangleMesh::apply_transform(const Transform& t)
+{
+    if(t == Transform::Identity()) return;
+    
+    for(int i = 0; i < vertices.size(); i++)
+        vertices[i] = t.apply_point(vertices[i]);
+    for(int i = 0; i < normals.size(); i++)
+        normals[i] = t.apply_vector(normals[i]);
+    compute_aabb();
+}
+
 void TriangleMesh::load_from_ply(const string& filename)
 {
     std::ifstream f(filename, std::ios::binary);

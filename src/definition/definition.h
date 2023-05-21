@@ -26,10 +26,6 @@ using json = nlohmann::json;
 using tcnn::GPUMemory, tcnn::GPUMatrix;
 
 #include <chrono>
-#include <iostream>
-#define TICK(x) auto x = std::chrono::system_clock::now()
-#define TOCK(x) std::cout << #x << " : " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - x).count() << "ms" << std::endl
-
 #include <vector>
 #include <string>
 #include <map>
@@ -83,3 +79,5 @@ inline string to_str(const T& value)
     ss << value;
     return ss.str();
 }
+
+#define LOG_ERROR(format, ...) printf("[ERROR] :" format "\n", ##__VA_ARGS__)

@@ -1,6 +1,6 @@
 #include "integrator.h"
 
-REGISTER_RENDER_PROCESS_CPP(PathTracer);
+REGISTER_RENDER_PASS_CPP(PathTracer);
 
 void PathTracer::set_scene(shared_ptr<Scene> _scene)
 {
@@ -11,7 +11,7 @@ void PathTracer::set_scene(shared_ptr<Scene> _scene)
 
 void PathTracer::render(shared_ptr<Film> film)
 {
-    PathTracerData data(samples_per_pixel, max_depth, tracer->get_light(), { 0.0f, 0.0f, 0.0f });
+    PathTracerData data(samples_per_pixel, max_depth, scene->d_scene.light, { 0.0f, 0.0f, 0.0f });
     int seed = random_int(0, INT32_MAX);
     Camera camera = *(scene->camera);
     float4* pixels = film->get_pixels();

@@ -97,10 +97,11 @@ public:
             return emission_color;
         case Type::UVMap:
         {
-            float3 world_dir = make_float3(dir.x, -dir.z, dir.y);
-            float2 phi_theta = dir_to_spherical(world_dir);
-            float2 texcoord = make_float2(phi_theta.x * 0.5f * M_1_PI + 0.5f, phi_theta.y * M_1_PI);
-            return make_float3(tex2D<float4>(texture, texcoord.x, texcoord.y));
+            // world space y axis is up, math space z axis is up
+            float3 math_space_dir = make_float3(-dir.x, dir.z, dir.y);
+            float2 phi_theta = cartesian_to_spherical_uv(math_space_dir);
+            float2 uv = make_float2(phi_theta.x * 0.5f * M_1_PI + 0.5f, phi_theta.y * M_1_PI);
+            return make_float3(tex2D<float4>(texture, uv.x, uv.y));
         }
         case Type::CubeMap:
             return make_float3(texCubemap<float4>(texture, dir.x, dir.y, dir.z));

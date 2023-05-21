@@ -22,6 +22,7 @@ public:
     void set_texture(int _t) { texture_id = _t; }
 
     void compute_aabb();
+    void apply_transform(const Transform& t);
     void load_from_ply(const string& filename);
     void load_from_others(const string& filename);
     void load_from_file(const string& filename);

@@ -1,34 +1,40 @@
 #pragma once
 
 #include <cuda_runtime.h>
-#include <thrust/pair.h>
 #include "helper_math.h"
 
-__host__ __device__ inline float radians(float deg)
+/* basic math */
+
+__host__ __device__ inline float Radians(float deg)
 {
     return deg * M_PI / 180.0f;
 }
 
-__host__ __device__ inline float2 dir_to_spherical(float3 dir)
+__host__ __device__ inline float Degrees(float rad)
 {
-    // z axis is up
-    float phi = atan2(dir.y, dir.x);
-    float theta = acos(dir.z);
+    return rad * 180.0f / M_PI;
+}
+
+// normalized vector to spherical uv coordinate,  [-pi, pi] x [0, pi]
+__host__ __device__ inline float2 cartesian_to_spherical_uv(float3 p)
+{
+    float phi = atan2(p.y, p.x);
+    float theta = acos(p.z);
     return make_float2(phi, theta);
 }
 
-__host__ __device__ inline float3 spherical_to_dir(float2 spherical)
+// [phi, theta] to normalized vector
+__host__ __device__ inline float3 spherical_uv_to_cartesian(float2 uv)
 {
-    float sin_theta = sin(spherical.y);
-    float cos_theta = cos(spherical.y);
-    return make_float3(cos(spherical.x) * sin_theta, sin(spherical.x) * sin_theta, cos_theta);
+    float sin_theta = sin(uv.y), cos_theta = cos(uv.y);
+    return make_float3(cos(uv.x) * sin_theta, sin(uv.x) * sin_theta, cos_theta);
 }
 
 // pack pointer
-__host__ __device__ inline thrust::pair<unsigned, unsigned> pack_pointer(void* ptr)
+__host__ __device__ inline uint2 pack_pointer(void* ptr)
 {
     unsigned long long p = reinterpret_cast<unsigned long long>(ptr);
-    return thrust::make_pair(static_cast<unsigned>(p >> 32), static_cast<unsigned>(p & 0xffffffff));
+    return make_uint2(static_cast<unsigned>(p >> 32), static_cast<unsigned>(p & 0xffffffff));
 }
 
 __host__ __device__ inline void* unpack_pointer(unsigned i0, unsigned i1)
@@ -38,7 +44,8 @@ __host__ __device__ inline void* unpack_pointer(unsigned i0, unsigned i1)
 }
 
 
-// sample
+/* sample */
+
 __host__ __device__ inline float3 uniform_sample_hemisphere(float2 sample)
 {
     float z = sample.x;
@@ -98,8 +105,7 @@ __host__ __device__ inline float uniform_disk_pdf()
 
 __host__ __device__ inline float3 cosine_sample_hemisphere(float2 sample)
 {
-    // float2 d = concentric_sample_disk(sample);
-    float2 d = uniform_sample_disk(sample);
+    float2 d = concentric_sample_disk(sample);
     float z = sqrt(fmax(0.0f, 1.0f - d.x * d.x - d.y * d.y));
     return make_float3(d.x, d.y, z);
 }
@@ -109,14 +115,6 @@ __host__ __device__ inline float cosine_hemisphere_pdf(float cos_theta)
     return cos_theta * M_1_PI;
 }
 
-__host__ __device__ inline float3 uniform_sample_cone(float2 sample, float max_cosine)
-{
-    float cosine = (1.0f - sample.x) + sample.x * max_cosine;
-    float sine = sqrt(1.0f - cosine * cosine);
-    float phi = 2.0f * M_PI * sample.y;
-    return make_float3(cos(phi) * sine, sin(phi) * sine, cosine);
-}
-
 __host__ __device__ inline float2 uniform_sample_triangle(float2 sample)
 {
     float sx = sqrt(sample.x);
@@ -124,11 +122,13 @@ __host__ __device__ inline float2 uniform_sample_triangle(float2 sample)
 }
 
 
-// disney material helper funcitons
-__host__ __device__ inline float fresnel(float cos_theta_i, float cos_theta_t, float eta)
+/* disney material helper functions */
+
+
+__host__ __device__ inline float Fresnel(float cos_theta_i, float cos_theta_t, float eta)
 {
-    float r_parl = ((eta * cos_theta_i) - cos_theta_t) / ((eta * cos_theta_i) + cos_theta_t);
-    float r_perp = ((cos_theta_i)-(eta * cos_theta_t)) / ((cos_theta_i)+(eta * cos_theta_t));
+    float r_parl = (eta * cos_theta_i - cos_theta_t) / (eta * cos_theta_i + cos_theta_t);
+    float r_perp = (cos_theta_i - eta * cos_theta_t) / (cos_theta_i + eta * cos_theta_t);
     return (r_parl * r_parl + r_perp * r_perp) * 0.5f;
 }
 
@@ -145,7 +145,7 @@ __host__ __device__ inline float fresnel_mix(float metallic, float eta, float co
     return lerp(schlick_fresnel(cos_theta, eta), schlick_fresnel(cos_theta), metallic);
 }
 
-__host__ __device__ inline float luminance(float3 color)
+__host__ __device__ inline float Luminance(float3 color)
 {
     return dot(color, make_float3(0.2126f, 0.7152f, 0.0722f));
 }
@@ -195,7 +195,6 @@ __host__ __device__ inline float3 refract(float3 i, float3 n, float eta)
 {
     float n_i = dot(n, -i);
     float k = 1.0f - eta * eta * (1.0f - n_i * n_i);
-    if (k < 0.0f)
-        return make_float3(0.0f);
+    if (k < 0.0f) return make_float3(0.0f);
     return eta * i + (eta * n_i - sqrt(k)) * n;
 }
