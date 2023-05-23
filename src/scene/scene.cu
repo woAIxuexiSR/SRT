@@ -43,7 +43,7 @@ int Scene::add_material(shared_ptr<Material> material, string name, int texture_
     return id;
 }
 
-int Scene::add_textures(shared_ptr<Texture> texture, string name)
+int Scene::add_texture(shared_ptr<Texture> texture, string name)
 {
     int id = textures.size();
     name = (name == "") ? "texture_" + std::to_string(id) : name;
@@ -189,7 +189,7 @@ void Scene::load_from_model(const string& filename)
             {
                 shared_ptr<Texture> texture = make_shared<Texture>();
                 texture->load_from_file(folder / texname.C_Str());
-                texture_id = add_textures(texture, texname.C_Str());
+                texture_id = add_texture(texture, texname.C_Str());
             }
         }
 

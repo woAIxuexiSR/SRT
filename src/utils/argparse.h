@@ -141,8 +141,12 @@ public:
 
         if (argc == 1)
         {
-            print_usage();
-            exit(0);
+            if(arguments.size() != 0)
+            {
+                print_usage();
+                exit(0);
+            }
+            return *this;
         }
 
         vector<string> tokens;

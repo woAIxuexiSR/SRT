@@ -68,7 +68,7 @@ public:
     int add_mesh(shared_ptr<TriangleMesh> mesh, int material_id);
     int add_animated_mesh(shared_ptr<AnimatedTriangleMesh> mesh, int material_id);
     int add_material(shared_ptr<Material> material, string name = "", int texture_id = -1);
-    int add_textures(shared_ptr<Texture> texture, string name = "");
+    int add_texture(shared_ptr<Texture> texture, string name = "");
 
     void set_background(float3 _b) { background = _b; }
     void load_environment_map(const vector<string>& faces);

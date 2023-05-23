@@ -1,56 +1,69 @@
 #include <iostream>
 #include "renderer.h"
+#include "argparse.h"
 
-int main(int argc, char** argv)
+json load_from_file(const string& path)
 {
-    std::filesystem::path config_path(__FILE__);
-    config_path = config_path.parent_path().parent_path() / "config" / "default.json";
-    std::ifstream f(config_path);
-    json config = json::parse(f);
+    std::ifstream f(path);
+    if(!f.is_open())
+    {
+        LOG_ERROR("Failed to open file: %s", path.c_str());
+        exit(-1);
+    }
+
+    json j = json::parse(f);
     f.close();
+    return j;
+}
 
-    int width = config.at("width");
-    int height = config.at("height");
+shared_ptr<Renderer> create_renderer(const string& path, const json& config)
+{
+    string type = config.at("type");
+    string output = config.value("output", "");
+    vector<int> resolution = config.value("resolution", vector<int>({1920, 1080}));
+    int frame = config.value("frame", 0);
 
-    // build scene
-    json scene_config = config.at("scene");
+    shared_ptr<Renderer> renderer;
+    if(type == "image")
+        renderer = make_shared<ImageRenderer>(path, output);
+    else if(type == "interactive")
+        renderer = make_shared<InteractiveRenderer>(path);
+    else if(type == "video")
+        renderer = make_shared<VideoRenderer>(path, output, frame);
+    else
+        LOG_ERROR("Unknown renderer type: %s", type.c_str());
 
-    shared_ptr<Scene> scene = make_shared<Scene>();
-    json camera_config = scene_config.at("camera");
-    auto vec_to_f3 = [](const vector<float>& v) -> float3 {
-        return { v[0], v[1], v[2] };
-    };
-    Transform transform = Transform::LookAt(
-        vec_to_f3(camera_config.at("position")),
-        vec_to_f3(camera_config.at("target")),
-        vec_to_f3(camera_config.at("up"))
-    );
-    float aspect = (float)width / (float)height;
-    float fov = camera_config.at("fov");
-    shared_ptr<Camera> camera = make_shared<Camera>();
-    camera->set_type(Camera::Type::Perspective);
-    camera->set_aspect_fov(aspect, fov);
-    // shared_ptr<Camera> camera = make_shared<Camera>(Camera::Mode::Environment, aspect, fov);
-    // camera->set_thin_lens(5.0f, 0.1f);
-    float radius = length(vec_to_f3(camera_config.at("target")) - vec_to_f3(camera_config.at("position")));
-    camera->set_controller(transform, radius, CameraController::Type::Orbit);
+    renderer->resize(resolution[0], resolution[1]);
+    return renderer;
+}
 
+int main(int argc, char* argv[])
+{
+    std::filesystem::path path(__FILE__);
+    string example_path = path.parent_path().parent_path() / "example" / "default.json";
 
-    json model_config = scene_config.at("model");
-    scene->set_camera(camera);
-    scene->load_from_model(model_config.at("path").get<string>());
-    scene->build_device_data();
+    auto args = argparser("SRT Renderer")
+        .set_program_name("main")
+        .add_help_option()
+        .add_option("-c", "--config", "Path to config file", example_path)
+        .add_option("-r", "--render", "Override the render config", string(""))
+        .add_option("-p", "--passes", "Override the passes config", string(""))
+        .add_option("-s", "--scene", "Override the scene config", string(""))
+        .parse(argc, argv);
 
-    // render
-    json render_config = config.at("render");
-
-    string output = render_config.at("output");
-    ImageRenderer renderer(width, height, scene, output);
-    renderer.load_passes_from_config(render_config.at("processes"));
-    // InteractiveRenderer renderer(width, height, scene);
-    // renderer.load_processes_from_config(render_config.at("processes"));
-
-    renderer.run();
+    string config_path = args.get<string>("config");
+    json config = load_from_file(config_path);
+    if (args.get<string>("render") != "")
+        config["render"] = load_from_file(args.get<string>("render"));
+    if(args.get<string>("passes") != "")
+        config["passes"] = load_from_file(args.get<string>("passes"));
+    if(args.get<string>("scene") != "")
+        config["scene"] = load_from_file(args.get<string>("scene"));
+    
+    auto renderer = create_renderer(config_path, config.at("render"));
+    renderer->load_scene(config.at("scene"));
+    renderer->load_passes(config.at("passes"));
+    renderer->run();
 
     return 0;
 }

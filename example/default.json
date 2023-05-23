@@ -17,7 +17,7 @@
     "scene": {
         "model": {
             "type": "pbrt",
-            "path": "scene.pbrt"
+            "path": "cornell_box.pbrt"
         }
     }
 }

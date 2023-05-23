@@ -1,11 +1,11 @@
 #include "pbrtparse.h"
 
-void PBRTParser::reset_state()
+void PBRTState::reset()
 {
     material_id = -1;
-    texture_id = -1;
     emission = make_float3(0.0f, 0.0f, 0.0f);
     transform = Transform();
+    mesh = nullptr;
 }
 
 string PBRTParser::next_quoted()
@@ -87,7 +87,7 @@ void PBRTParser::ignore()
     next_parameter_list();
 }
 
-void PBRTParser::load_shape(const string& type, const unordered_map<string, string>& params)
+shared_ptr<TriangleMesh> PBRTParser::load_shape(const string& type, const unordered_map<string, string>& params)
 {
     shared_ptr<TriangleMesh> mesh = make_shared<TriangleMesh>();
     if (type == "plymesh")
@@ -95,11 +95,10 @@ void PBRTParser::load_shape(const string& type, const unordered_map<string, stri
         auto it = params.find("string filename");
         if (it == params.end())
         {
-            cout << "ERROR:: No filename specified for plymesh" << endl;
-            return;
+            LOG_ERROR("No filename specified for plymesh");
+            return nullptr;
         }
         string mesh_path = folderpath / dequote(it->second);
-        // cout << "Loading mesh: " << mesh_path << endl;
         mesh->load_from_file(mesh_path);
     }
     else if (type == "trianglemesh")
@@ -107,8 +106,8 @@ void PBRTParser::load_shape(const string& type, const unordered_map<string, stri
         auto it = params.find("point3 P");
         if (it == params.end())
         {
-            cout << "ERROR:: No point3 P specified for trianglemesh" << endl;
-            return;
+            LOG_ERROR("No point3 P specified for trianglemesh");
+            return nullptr;
         }
         vector<float> P = parse_to_vector<float>(it->second);
         vector<float3> vertices(P.size() / 3);
@@ -117,8 +116,8 @@ void PBRTParser::load_shape(const string& type, const unordered_map<string, stri
         it = params.find("integer indices");
         if (it == params.end())
         {
-            cout << "ERROR:: No integer indices specified for trianglemesh" << endl;
-            return;
+            LOG_ERROR("No integer indices specified for trianglemesh");
+            return nullptr;
         }
         vector<int> I = parse_to_vector<int>(it->second);
         vector<uint3> indices(I.size() / 3);
@@ -141,21 +140,16 @@ void PBRTParser::load_shape(const string& type, const unordered_map<string, stri
             texcoords.resize(uv.size() / 2);
             memcpy(texcoords.data(), uv.data(), uv.size() * sizeof(float));
         }
+
         mesh->load_from_triangles(vertices, indices, normals, texcoords);
     }
     else
     {
-        cout << "ERROR:: Unsupported shape type: " << type << endl;
-        return;
+        LOG_ERROR("Unsupported shape type: %s", type.c_str());
+        return nullptr;
     }
 
-    for (int i = 0; i < mesh->vertices.size(); i++)
-        mesh->vertices[i] = transform.apply_point(mesh->vertices[i]);
-    for (int i = 0; i < mesh->normals.size(); i++)
-        mesh->normals[i] = transform.apply_vector(mesh->normals[i]);
-    mesh->compute_aabb();
-
-    scene->add_mesh(mesh, material_id);
+    return mesh;
 }
 
 void PBRTParser::load_material(const string& name, const string& type, const unordered_map<string, string>& params)
@@ -169,19 +163,23 @@ void PBRTParser::load_material(const string& name, const string& type, const uno
         material->color = make_float3(color[0], color[1], color[2]);
     }
     it = params.find("texture reflectance");
+    int texture_id = -1;
     if (it != params.end())
     {
         string texture_name = dequote(it->second);
         texture_id = scene->get_texture_id(texture_name);
         if (texture_id == -1)
         {
-            cout << "ERROR:: Texture " << texture_name << " not found" << endl;
+            LOG_ERROR("Texture %s not found", texture_name.c_str());
             return;
         }
     }
 
     material->type = Material::Type::Diffuse;
-    material_id = scene->add_material(material, name, texture_id);
+    int id = scene->add_material(material, name, texture_id);
+
+    if (in_attribute) attribute_state.material_id = id;
+    else global_state.material_id = id;
 }
 
 void PBRTParser::load_texture(const string& name, const unordered_map<string, string>& params)
@@ -189,14 +187,14 @@ void PBRTParser::load_texture(const string& name, const unordered_map<string, st
     auto it = params.find("string filename");
     if (it == params.end())
     {
-        cout << "ERROR:: No filename specified for texture" << endl;
+        LOG_ERROR("No filename specified for texture");
         return;
     }
     string texture_path = folderpath / dequote(it->second);
 
     shared_ptr<Texture> texture = make_shared<Texture>();
     texture->load_from_file(texture_path);
-    texture_id = scene->add_textures(texture, name);
+    scene->add_texture(texture, name);
 }
 
 PBRTParser::PBRTParser(const string& filename)
@@ -206,17 +204,20 @@ PBRTParser::PBRTParser(const string& filename)
 
     if (filename.substr(filename.find_last_of(".") + 1) != "pbrt")
     {
-        cout << "ERROR:: " << filename << " is not a pbrt file" << endl;
+        LOG_ERROR("%s is not a pbrt file", filename.c_str());
         return;
     }
 
     file.open(filename);
     if (!file.is_open())
     {
-        cout << "ERROR:: Failed to open file: " << filename << endl;
+        LOG_ERROR("Failed to open file: %s", filename.c_str());
         return;
     }
 
+    global_state.reset();
+    attribute_state.reset();
+    in_attribute = false;
     scene = make_shared<Scene>();
 }
 
@@ -228,6 +229,7 @@ PBRTParser::~PBRTParser()
 void PBRTParser::parse()
 {
     shared_ptr<Camera> camera = make_shared<Camera>();
+    Transform camera_transform;
 
     string token;
     while (file >> token)
@@ -239,8 +241,11 @@ void PBRTParser::parse()
             string t = next_bracketed();
             vector<float> v = parse_to_vector<float>(t);
             SquareMatrix<4> m(v.data());
-            transform = Transform(Transpose(m));
-            transform = Transform::Inverse(transform);
+
+            if (in_attribute)
+                attribute_state.transform = Transform::Inverse(Transpose(m));
+            else
+                global_state.transform = Transform::Inverse(Transpose(m));
         }
         else if (token == "Sampler")
             ignore();
@@ -258,13 +263,13 @@ void PBRTParser::parse()
             next_quoted();      // only support perspective
             auto params = next_parameter_list();
             float fov = std::stof(params["float fov"]);
+            camera->set_type(Camera::Type::Perspective);
             camera->set_aspect_fov((float)width / (float)height, fov);
+            camera_transform = global_state.transform;
         }
         else if (token == "WorldBegin")
         {
-            // the former transform is the camera transform
-            camera->set_controller(transform, 1.0f);
-            reset_state();
+            global_state.reset();
         }
         else if (token == "WorldEnd") {}
         else if (token == "MakeNamedMaterial")
@@ -274,7 +279,7 @@ void PBRTParser::parse()
             auto it = params.find("string type");
             if (it == params.end())
             {
-                cout << "ERROR:: No type specified for material " << name << endl;
+                LOG_ERROR("No type specified for material");
                 return;
             }
             load_material(name, dequote(it->second), params);
@@ -282,12 +287,10 @@ void PBRTParser::parse()
         else if (token == "NamedMaterial")
         {
             string name = next_quoted();
-            material_id = scene->get_material_id(name);
-            if (length(emission) > 0.0f)
-            {
-                scene->materials[material_id]->emission_color = emission;
-                scene->materials[material_id]->intensity = 1.0f;
-            }
+            int id = scene->get_material_id(name);
+
+            if (in_attribute) attribute_state.material_id = id;
+            else global_state.material_id = id;
         }
         else if (token == "Material")
         {
@@ -307,23 +310,46 @@ void PBRTParser::parse()
         {
             string type = next_quoted();
             auto params = next_parameter_list();
-            load_shape(type, params);
+            shared_ptr<TriangleMesh> mesh = load_shape(type, params);
+
+            if (in_attribute) attribute_state.mesh = mesh;
+            else
+            {
+                mesh->apply_transform(global_state.transform);
+                assert(global_state.material_id != -1);
+                scene->add_mesh(mesh, global_state.material_id);
+            }
         }
-        else if (token == "AttributeBegin") {}
-        else if (token == "AttributeEnd") { /*reset_state();*/ }
+        else if (token == "AttributeBegin")
+        {
+            in_attribute = true;
+            attribute_state = global_state;
+        }
+        else if (token == "AttributeEnd")
+        {
+            attribute_state.mesh->apply_transform(attribute_state.transform);
+            scene->materials[attribute_state.material_id]->emission_color = attribute_state.emission;
+            scene->materials[attribute_state.material_id]->intensity = 1.0f;
+            scene->add_mesh(attribute_state.mesh, attribute_state.material_id);
+            in_attribute = false;
+        }
         else if (token == "AreaLightSource")
         {
             next_quoted();      // only support diffuse
             auto params = next_parameter_list();
             vector<float> v = parse_to_vector<float>(params["rgb L"]);
-            emission = make_float3(v[0], v[1], v[2]);
+            assert(in_attribute == true);
+            attribute_state.emission = make_float3(v[0], v[1], v[2]);
         }
         else
         {
-            cout << "ERROR:: Unknown token: " << token << endl;
+            LOG_ERROR("Unsupported token: %s", token.c_str());
         }
     }
 
-
+    AABB aabb = scene->get_aabb();
+    float3 camera_pos = camera_transform.apply_point(make_float3(0.0f, 0.0f, 0.0f));
+    float radius = length(aabb.center() - camera_pos);
+    camera->set_controller(camera_transform, radius);
     scene->set_camera(camera);
 }

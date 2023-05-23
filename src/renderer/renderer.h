@@ -11,66 +11,64 @@
 #include "gui.h"
 #include "pbrtparse.h"
 
-class ImageRenderer
+
+class Renderer
 {
-private:
+protected:
+    std::filesystem::path config_path;
+
     int width, height;
     shared_ptr<Scene> scene;
-
     shared_ptr<Film> film;
     vector<shared_ptr<RenderPass> > passes;
 
+public:
+    Renderer(const string& _config_path) : config_path(_config_path) {}
+    ~Renderer() { Profiler::reset(); }
+    void set_scene(shared_ptr<Scene> _scene) { scene = _scene; }
+    void resize(int _w, int _h);
+
+    virtual void load_passes(const json& config);
+    virtual void load_scene(const json& config);
+    virtual void run() = 0;
+};
+
+
+class ImageRenderer : public Renderer
+{
+private:
     string filename;
 
 public:
-    ImageRenderer(int _w, int _h, shared_ptr<Scene> _scene, string _filename);
-    void load_passes_from_config(const json &config);
-    void run();
+    ImageRenderer(const string& _config_path, const string& _filename)
+        : Renderer(_config_path), filename(_filename) {}
+
+    virtual void run() override;
 };
 
-class InteractiveRenderer
+
+class InteractiveRenderer : public Renderer
 {
 private:
-    int width, height;
-    shared_ptr<Scene> scene;
-
-    shared_ptr<Film> film;
-    vector<shared_ptr<RenderPass> > passes;
-
     shared_ptr<GUI> gui;
 
 public:
-    InteractiveRenderer(int _w, int _h, shared_ptr<Scene> _scene);
-    void load_passes_from_config(const json &config);
-    void run();
+    InteractiveRenderer(const string& _config_path)
+        : Renderer(_config_path) {}
+
+    virtual void load_scene(const json& config) override;
+    virtual void run() override;
 };
 
-class VideoRenderer
+class VideoRenderer : public Renderer
 {
+private:
+    string filename;
+    int frame;
+
+public:
+    VideoRenderer(const string& _config_path, const string& _filename, int _f)
+        : Renderer(_config_path), filename(_filename), frame(_f) {}
+
+    virtual void run() override;
 };
-
-
-// void Scene::load_from_config(const json& config, int width, int height)
-// {
-//     json camera_config = config.at("camera");
-//     auto vec_to_f3 = [](const vector<float>& v) -> float3 {
-//         return { v[0], v[1], v[2] };
-//     };
-//     Transform transform = Transform::LookAt(
-//         vec_to_f3(camera_config.at("position")),
-//         vec_to_f3(camera_config.at("target")),
-//         vec_to_f3(camera_config.at("up"))
-//     );
-//     float aspect = (float)width / (float)height;
-//     float fov = camera_config.at("fov");
-//     shared_ptr<Camera> camera = make_shared<Camera>(Camera::Mode::Perspective, aspect, fov);
-//     // shared_ptr<Camera> camera = make_shared<Camera>(Camera::Mode::Environment, aspect, fov);
-//     // camera->set_thin_lens(5.0f, 0.1f);
-//     float radius = length(vec_to_f3(camera_config.at("target")) - vec_to_f3(camera_config.at("position")));
-//     camera->set_controller(CameraController::Type::Orbit, transform, radius);
-
-
-//     json model_config = config.at("model");
-//     set_camera(camera);
-//     load_from_model(model_config.at("path").get<string>());
-// }

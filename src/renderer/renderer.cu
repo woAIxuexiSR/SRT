@@ -1,73 +1,116 @@
 #include "renderer.h"
 
-ImageRenderer::ImageRenderer(int _w, int _h, shared_ptr<Scene> _scene, string _filename)
-    : width(_w), height(_h), scene(_scene), filename(_filename)
+void Renderer::resize(int _w, int _h)
 {
-    // PBRTParser parser("../../data/data/cornell-box/scene-v4.pbrt");
-    // PBRTParser parser("../../data/data/bathroom2/scene-v4.pbrt");
-    // parser.parse();
-    // scene = parser.get_scene();
-    // width = parser.width;
-    // height = parser.height;
-
+    width = _w;
+    height = _h;
     film = make_shared<Film>(width, height);
 }
 
-void ImageRenderer::load_passes_from_config(const json& config)
+void Renderer::load_passes(const json& config)
 {
     for (auto& c : config)
     {
         string name = c.at("name");
 
-        shared_ptr<RenderPass> process = RenderPassFactory::create_pass(name, c["params"]);
-        process->set_enable(c.at("enable"));
-        process->resize(width, height);
-        process->set_scene(scene);
+        shared_ptr<RenderPass> pass = RenderPassFactory::create_pass(name, c["params"]);
+        pass->set_enable(c.value("enable", true));
+        pass->resize(width, height);
+        pass->set_scene(scene);
 
-        passes.push_back(process);
+        passes.push_back(pass);
     }
+}
+
+Camera::Type string_to_camera_type(const string& str)
+{
+    if (str == "perspective")
+        return Camera::Type::Perspective;
+    if (str == "orthographic")
+        return Camera::Type::Orthographic;
+    if (str == "thinlens")
+        return Camera::Type::ThinLens;
+    if (str == "environment")
+        return Camera::Type::Environment;
+
+    LOG_ERROR("Unknown camera type: %s", str.c_str());
+    return Camera::Type::Perspective;
+}
+
+void Renderer::load_scene(const json& config)
+{
+    // load meshes
+    json model_config = config.at("model");
+    string type = model_config.at("type");
+    string path = config_path.parent_path() / model_config.at("path").get<string>();
+
+    if (type == "pbrt")
+    {
+        PBRTParser parser(path);
+        parser.parse();
+        set_scene(parser.scene);
+        width = parser.width;
+        height = parser.height;
+    }
+    else
+    {
+        scene = make_shared<Scene>();
+        scene->load_from_model(path);
+
+        // load camera
+        json camera_config = config.at("camera");
+        shared_ptr<Camera> camera = make_shared<Camera>();
+        auto vec_to_f3 = [](const vector<float>& v) -> float3 { return { v[0], v[1], v[2] }; };
+        float3 position = vec_to_f3(camera_config.at("position"));
+        float3 target = vec_to_f3(camera_config.at("target"));
+        float3 up = vec_to_f3(camera_config.at("up"));
+
+        camera->set_type(string_to_camera_type(camera_config.at("type")));
+        camera->set_controller(Transform::LookAt(position, target, up), length(position - target));
+        camera->set_focal_aperture(camera_config.value("focal", 1.0f), camera_config.value("aperture", 0.0f));
+
+        scene->set_camera(camera);
+
+        // load environment light
+        if (config.find("environment") != config.end())
+        {
+            json env_config = config.at("environment");
+            string env_type = env_config.at("type");
+            if (env_type == "constant")
+                scene->set_background(vec_to_f3(env_config.at("color")));
+            else if (env_type == "uvmap")
+            {
+                string env_path = config_path.parent_path() / env_config.at("path").get<string>();
+                scene->load_environment_map(vector<string>({ env_path }));
+            }
+            else if (env_type == "cubemap")
+            {
+                vector<string> paths;
+                for (auto& p : env_config.at("path"))
+                    paths.push_back(config_path.parent_path() / p.get<string>());
+                scene->load_environment_map(paths);
+            }
+            else
+                LOG_ERROR("Unknown environment type: %s", env_type.c_str());
+        }
+    }
+
+    scene->build_device_data();
 }
 
 void ImageRenderer::run()
 {
-    PROFILE("Render");
-
-    for (auto process : passes)
-        process->render(film);
+    for (auto pass : passes)
+        pass->render(film);
     film->save(filename);
 
-    Profiler::stop();
     Profiler::print();
-    Profiler::reset();
 }
 
-InteractiveRenderer::InteractiveRenderer(int _w, int _h, shared_ptr<Scene> _scene)
-    : width(_w), height(_h), scene(_scene)
+void InteractiveRenderer::load_scene(const json& config)
 {
-    // PBRTParser parser("../../data/data/cornell-box/scene-v4.pbrt");
-    // PBRTParser parser("../../data/data/bedroom/scene-v4.pbrt");
-    // parser.parse();
-    // scene = parser.get_scene();
-    // width = parser.width;
-    // height = parser.height;
-
-    film = make_shared<Film>(width, height);
+    Renderer::load_scene(config);
     gui = make_shared<GUI>(width, height, scene->camera);
-}
-
-void InteractiveRenderer::load_passes_from_config(const json& config)
-{
-    for (auto& c : config)
-    {
-        string name = c.at("name");
-
-        shared_ptr<RenderPass> process = RenderPassFactory::create_pass(name, c["params"]);
-        process->set_enable(c.at("enable"));
-        process->resize(width, height);
-        process->set_scene(scene);
-
-        passes.push_back(process);
-    }
 }
 
 void InteractiveRenderer::run()
@@ -77,13 +120,51 @@ void InteractiveRenderer::run()
         gui->begin_frame();
 
         scene->render_ui();
-        for (auto process : passes)
+        for (auto pass : passes)
         {
-            process->render(film);
-            process->render_ui();
+            pass->render(film);
+            pass->render_ui();
         }
+        Profiler::render_ui();
 
-        gui->end_frame();
         gui->write_texture(film->get_pixels());
+        gui->end_frame();
+    }
+}
+
+void VideoRenderer::run()
+{
+    string command = "mkdir temporary_images";
+    int result = std::system(command.c_str());
+    if (result != 0)
+    {
+        LOG_ERROR("Failed to create temporary_images folder");
+        return;
+    }
+
+    for (int i = 0; i < frame; i++)
+    {
+        for (auto pass : passes)
+            pass->render(film);
+        film->save("temporary_images/" + std::to_string(i) + ".png");
+    }
+
+    command = "ffmpeg -y -framerate 60 -i temporary_images/%d.png ";
+    command += "-c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p ";
+    command += filename;
+
+    result = std::system(command.c_str());
+    if (result != 0)
+    {
+        LOG_ERROR("Failed to create video");
+        return;
+    }
+
+    command = "rm -rf temporary_images";
+    result = std::system(command.c_str());
+    if (result != 0)
+    {
+        LOG_ERROR("Failed to remove temporary_images folder");
+        return;
     }
 }
