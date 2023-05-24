@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 
 project(SRT LANGUAGES C CXX CUDA)
 
@@ -10,10 +10,18 @@ set(CMAKE_BUILD_TYPE Debug)
 
 set(EXTENSIONS_DIR "${CMAKE_SOURCE_DIR}/extensions")
 
-# glad and glfw
-set(OPENGL_INCLUDE "${EXTENSIONS_DIR}/OpenGL")
-set(OPENGL_LIB "glfw")
-set(OPENGL_SRC "${EXTENSIONS_DIR}/OpenGL/glad.c")
+# opengl
+find_package(OpenGL REQUIRED)
+set(OPENGL_LIB "OpenGL::GL")
+
+# glad
+set(GLAD_INCLUDE "${EXTENSIONS_DIR}/glad")
+set(GLAD_SRC "${EXTENSIONS_DIR}/glad/glad.c")
+
+# glfw
+add_subdirectory("${EXTENSIONS_DIR}/glfw" EXCLUDE_FROM_ALL)
+set(GLFW_INCLUDE "${EXTENSIONS_DIR}/glfw/include")
+set(GLFW_LIB "glfw")
 
 # imgui
 set(IMGUI_INCLUDE "${EXTENSIONS_DIR}/imgui/include")
@@ -33,8 +41,9 @@ set(CUDA_INCLUDE "${CUDA_TOOLKIT_ROOT_DIR}/include")
 set(CUDA_LIB "${CUDA_LIBRARIES}" "${CUDA_CUDA_LIBRARY}" "cuda" "cublas")
 
 # assimp
-find_package(assimp REQUIRED)
-set(ASSIMP_LIB "assimp::assimp")
+add_subdirectory("${EXTENSIONS_DIR}/assimp" EXCLUDE_FROM_ALL)
+set(ASSIMP_INCLUDE "${EXTENSIONS_DIR}/assimp/include")
+set(ASSIMP_LIB "assimp")
 
 # stb_image
 set(STB_INCLUDE "${EXTENSIONS_DIR}/stb_image")
@@ -48,7 +57,7 @@ set(TINY_PLY_INCLUDE "${EXTENSIONS_DIR}/tinyply")
 set(JSON_INCLUDE "${EXTENSIONS_DIR}/json")
 
 # tiny cuda nn
-add_subdirectory(${EXTENSIONS_DIR}/tiny-cuda-nn)
+add_subdirectory(${EXTENSIONS_DIR}/tiny-cuda-nn EXCLUDE_FROM_ALL)
 set(TINY_CUDA_NN_INCLUDE "${EXTENSIONS_DIR}/tiny-cuda-nn/include")
 set(TINY_CUDA_NN_LIB "tiny-cuda-nn")
 
@@ -110,11 +119,13 @@ add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>)
 # add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
 
 list(APPEND PROJECT_INCLUDE 
-    ${OPENGL_INCLUDE}
+    ${GLAD_INCLUDE}
+    ${GLFW_INCLUDE}
     ${IMGUI_INCLUDE}
     ${IMPLOT_INCLUDE}
     ${IMZMO_INCLUDE}
     ${CUDA_INCLUDE}
+    ${ASSIMP_INCLUDE}
     ${STB_INCLUDE}
     ${TINY_EXR_INCLUDE}
     ${TINY_PLY_INCLUDE}

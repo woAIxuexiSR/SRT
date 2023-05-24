@@ -1,3 +1,9 @@
 [submodule "extensions/tiny-cuda-nn"]
 	path = extensions/tiny-cuda-nn
 	url = https://github.com/NVlabs/tiny-cuda-nn.git
+[submodule "extensions/assimp"]
+	path = extensions/assimp
+	url = https://github.com/assimp/assimp.git
+[submodule "extensions/glfw"]
+	path = extensions/glfw
+	url = https://github.com/glfw/glfw.git
