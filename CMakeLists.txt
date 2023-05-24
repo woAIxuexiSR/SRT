@@ -49,6 +49,7 @@ set(ASSIMP_LIB "assimp")
 set(STB_INCLUDE "${EXTENSIONS_DIR}/stb_image")
 # zlib
 find_package(ZLIB REQUIRED)
+set(ZLIB_INCLUDE "${ZLIB_INCLUDE_DIRS}")
 set(ZLIB_LIB "${ZLIB_LIBRARIES}")
 # tiny exr
 set(TINY_EXR_INCLUDE "${EXTENSIONS_DIR}/tinyexr")
@@ -127,6 +128,7 @@ list(APPEND PROJECT_INCLUDE
     ${CUDA_INCLUDE}
     ${ASSIMP_INCLUDE}
     ${STB_INCLUDE}
+    ${ZLIB_INCLUDE}
     ${TINY_EXR_INCLUDE}
     ${TINY_PLY_INCLUDE}
     ${JSON_INCLUDE}
