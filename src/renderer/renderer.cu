@@ -41,7 +41,7 @@ void Renderer::load_scene(const json& config)
     // load meshes
     json model_config = config.at("model");
     string type = model_config.at("type");
-    string path = config_path.parent_path() / model_config.at("path").get<string>();
+    string path = (config_path.parent_path() / model_config.at("path").get<string>()).string();
 
     if (type == "pbrt")
     {
@@ -80,14 +80,14 @@ void Renderer::load_scene(const json& config)
                 scene->set_background(vec_to_f3(env_config.at("color")));
             else if (env_type == "uvmap")
             {
-                string env_path = config_path.parent_path() / env_config.at("path").get<string>();
+                string env_path = (config_path.parent_path() / env_config.at("path").get<string>()).string();
                 scene->load_environment_map(vector<string>({ env_path }));
             }
             else if (env_type == "cubemap")
             {
                 vector<string> paths;
                 for (auto& p : env_config.at("path"))
-                    paths.push_back(config_path.parent_path() / p.get<string>());
+                    paths.push_back((config_path.parent_path() / p.get<string>()).string());
                 scene->load_environment_map(paths);
             }
             else
@@ -110,7 +110,7 @@ void ImageRenderer::run()
 
     {
         PROFILE("save");
-        film->save(config_path.parent_path() / filename);
+        film->save((config_path.parent_path() / filename).string());
     }
 
     Profiler::print();

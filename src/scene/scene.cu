@@ -188,7 +188,7 @@ void Scene::load_from_model(const string& filename)
             if (texture_id == -1)
             {
                 shared_ptr<Texture> texture = make_shared<Texture>();
-                texture->load_from_file(folder / texname.C_Str());
+                texture->load_from_file((folder / texname.C_Str()).string());
                 texture_id = add_texture(texture, texname.C_Str());
             }
         }

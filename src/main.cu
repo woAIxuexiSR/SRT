@@ -40,7 +40,7 @@ shared_ptr<Renderer> create_renderer(const string& path, const json& config)
 int main(int argc, char* argv[])
 {
     std::filesystem::path path(__FILE__);
-    string example_path = path.parent_path().parent_path() / "example" / "example_obj.json";
+    string example_path = (path.parent_path().parent_path() / "example" / "example_obj.json").string();
 
     auto args = argparser("SRT Renderer")
         .set_program_name("main")

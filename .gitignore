@@ -3,3 +3,5 @@
 build
 config
 data
+.vs
+CMakeSettings.json

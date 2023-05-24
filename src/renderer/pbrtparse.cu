@@ -98,7 +98,7 @@ shared_ptr<TriangleMesh> PBRTParser::load_shape(const string& type, const unorde
             LOG_ERROR("No filename specified for plymesh");
             return nullptr;
         }
-        string mesh_path = folderpath / dequote(it->second);
+        string mesh_path = (folderpath / dequote(it->second)).string();
         mesh->load_from_file(mesh_path);
     }
     else if (type == "trianglemesh")
@@ -190,7 +190,7 @@ void PBRTParser::load_texture(const string& name, const unordered_map<string, st
         LOG_ERROR("No filename specified for texture");
         return;
     }
-    string texture_path = folderpath / dequote(it->second);
+    string texture_path = (folderpath / dequote(it->second)).string();
 
     shared_ptr<Texture> texture = make_shared<Texture>();
     texture->load_from_file(texture_path);

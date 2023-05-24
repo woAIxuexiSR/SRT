@@ -172,7 +172,7 @@ GUI::GUI(int _w, int _h, shared_ptr<Camera> _c, int n)
     // create shader
     std::filesystem::path folder(__FILE__);
     folder = folder.parent_path();
-    program_id = create_program((folder / "hello.vert"), (folder / "hello.frag"));
+    program_id = create_program((folder / "hello.vert").string(), (folder / "hello.frag").string());
 
     // create vao, texture
     vaos.resize(num_textures);
