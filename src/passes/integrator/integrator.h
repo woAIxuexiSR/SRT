@@ -16,7 +16,7 @@ private:
 public:
     PathTracer() {}
 
-    virtual void set_scene(shared_ptr<Scene> scene) override;
+    virtual void set_scene(shared_ptr<Scene> _scene) override;
     virtual void render(shared_ptr<Film> film) override;
     virtual void render_ui() override;
 

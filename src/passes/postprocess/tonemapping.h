@@ -42,7 +42,7 @@ public:
     {
         if (j.is_null()) return;
 
-        p.type = j.value("type", ToneMappingType::None);
+        // p.type = j.value("type", ToneMappingType::None);
         p.exposure = j.value("exposure", 0.0f);
         p.use_gamma = j.value("use_gamma", true);
     }

@@ -1,0 +1,46 @@
+{
+    "render": {
+        "type": "interactive",
+        "output": "output.png",
+        "resolution": [
+            1920,
+            1080
+        ]
+    },
+    "passes": [
+        {
+            "name": "PathTracer",
+            "enable": true,
+            "params": {
+                "max_depth": 16,
+                "samples_per_pixel": 4,
+                "use_nee": true
+            }
+        },
+        {
+            "enable": true,
+            "name": "ToneMapping",
+            "params": {
+                "type": "ACES",
+                "use_gamma": true
+            }
+        }
+    ],
+    "scene": {
+        "model": {
+            "type": "obj",
+            "path": "cornell_box_obj/cornell_box.obj"
+        },
+        "camera": {
+            "type": "perspective",
+            "position": [0, 1, 5.5],
+            "target": [0, 1, 0.5],
+            "up": [0, 1, 0],
+            "fov": 60
+        },
+        "environment": {
+            "type": "constant",
+            "color": [0, 0, 0]
+        }
+    }
+}

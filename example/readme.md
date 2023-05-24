@@ -26,7 +26,7 @@ The passes section is an array of passes, where each pass is defined as an objec
 
 - **enable** : A boolean value indicating whether the pass should be enabled.
 
-- **params** : An object containing the parameters of the pass. Depending on the pass type. For more details, please refer to the [passes source code](src/passes/).
+- **params** : An object containing the parameters of the pass. Depending on the pass type. For more details, please refer to the [passes source code](../src/passes/).
 
 ## 4. Scene Section
 
@@ -46,7 +46,7 @@ The passes section is an array of passes, where each pass is defined as an objec
 
   - **up** : The up vector of the camera as a three-dimensional vector `[x, y, z]`.
 
-  - Other properties: Contains additional properties specific to different camera types. For more detailed information, please refer to the [cameras source code](src/device_include/scene/camera).
+  - Other properties: Contains additional properties specific to different camera types. For more detailed information, please refer to the [cameras source code](../src/device_include/scene/camera/).
 
 - **environment** : An object that encompasses the environment properties. Note that this section may be ignored if the file format is set to pbrt. The environment object includes the following properties:
 

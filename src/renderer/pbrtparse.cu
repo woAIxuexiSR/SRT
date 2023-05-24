@@ -175,7 +175,7 @@ void PBRTParser::load_material(const string& name, const string& type, const uno
         }
     }
 
-    material->type = Material::Type::Diffuse;
+    material->type = Material::Type::Disney;
     int id = scene->add_material(material, name, texture_id);
 
     if (in_attribute) attribute_state.material_id = id;

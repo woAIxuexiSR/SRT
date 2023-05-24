@@ -1,0 +1,23 @@
+{
+    "render": {
+        "type": "interactive",
+        "output": "output.exr"
+    },
+    "passes": [
+        {
+            "name": "PathTracer",
+            "enable": true,
+            "params": {
+                "max_depth": 16,
+                "sample_per_pixel": 128,
+                "use_nee": true
+            }
+        }
+    ],
+    "scene": {
+        "model": {
+            "type": "pbrt",
+            "path": "cornell_box.pbrt"
+        }
+    }
+}

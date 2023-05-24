@@ -4,7 +4,6 @@ void Renderer::resize(int _w, int _h)
 {
     width = _w;
     height = _h;
-    film = make_shared<Film>(width, height);
 }
 
 void Renderer::load_passes(const json& config)
@@ -66,6 +65,7 @@ void Renderer::load_scene(const json& config)
         float3 up = vec_to_f3(camera_config.at("up"));
 
         camera->set_type(string_to_camera_type(camera_config.at("type")));
+        camera->set_aspect_fov((float)width / (float)height, camera_config.value("fov", 60.0f));
         camera->set_controller(Transform::LookAt(position, target, up), length(position - target));
         camera->set_focal_aperture(camera_config.value("focal", 1.0f), camera_config.value("aperture", 0.0f));
 
@@ -96,13 +96,22 @@ void Renderer::load_scene(const json& config)
     }
 
     scene->build_device_data();
+    film = make_shared<Film>(width, height);
 }
 
 void ImageRenderer::run()
 {
-    for (auto pass : passes)
-        pass->render(film);
-    film->save(filename);
+    {
+        PROFILE("render");
+        for (auto pass : passes)
+            pass->render(film);
+
+    }
+
+    {
+        PROFILE("save");
+        film->save(config_path.parent_path() / filename);
+    }
 
     Profiler::print();
 }
@@ -151,7 +160,7 @@ void VideoRenderer::run()
 
     command = "ffmpeg -y -framerate 60 -i temporary_images/%d.png ";
     command += "-c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p ";
-    command += filename;
+    command += (config_path.parent_path() / filename).string();
 
     result = std::system(command.c_str());
     if (result != 0)
