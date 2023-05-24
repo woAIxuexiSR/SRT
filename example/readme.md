@@ -32,7 +32,7 @@ The passes section is an array of passes, where each pass is defined as an objec
 
 - **model** : An object that encompasses the model properties.
 
-  - **type** : The type of the model. Valid values are "pbrt" or any model file extensions supported by Assimp.
+  - **type** : The type of the model. Valid values are "pbrt" (only support a subset) or any model file extensions supported by Assimp.
 
   - **path** : The path to the model file.
 
