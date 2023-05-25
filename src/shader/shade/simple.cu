@@ -119,7 +119,11 @@ extern "C" __global__ void __raygen__()
         // result = make_float3(1.0f, 1.0f, 1.0f) * depth / params.extra;
         // result = info.normal * 0.5f + 0.5f;
         // result = info.color;
-        result = info.color * (abs(dot(info.normal, ray.dir)) * 0.7f + 0.3f);
+        // result = info.color * (abs(dot(info.normal, ray.dir)) * 0.7f + 0.3f);
+        if(info.inner)
+            result = make_float3(1.0f, 0.0f, 0.0f);
+        else
+            result = make_float3(0.0f, 1.0f, 0.0f);
     }
 
     params.pixels[idx] = make_float4(result, 1.0f);

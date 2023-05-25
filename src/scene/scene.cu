@@ -434,17 +434,33 @@ void Scene::create_device_lights()
 
 void Scene::render_ui()
 {
-    ImGui::ShowDemoWindow();
-    ImGui::Text("Camera");
-    ImGui::Text("position: (%.2f, %.2f, %.2f)", camera->controller.pos.x, camera->controller.pos.y, camera->controller.pos.z);
-    ImGui::Text("target: (%.2f, %.2f, %.2f)", camera->controller.target.x, camera->controller.target.y, camera->controller.target.z);
-    ImGui::Text("front: (%.2f, %.2f, %.2f)", camera->controller.z.x, camera->controller.z.y, camera->controller.z.z);
-    ImGui::Text("up: (%.2f, %.2f, %.2f)", camera->controller.y.x, camera->controller.y.y, camera->controller.y.z);
-    ImGui::Text("left: (%.2f, %.2f, %.2f)", camera->controller.x.x, camera->controller.x.y, camera->controller.x.z);
-    ImGui::Text("theta: %.2f", camera->controller.theta);
-    ImGui::Text("phi: %.2f", camera->controller.phi);
-    ImGui::Text("radius: %.2f", camera->controller.radius);
-    ImGui::Text("fov: %.2f", camera->fov);
+    if (!ImGui::CollapsingHeader("Scene"))
+        return;
 
-    ImGui::Combo("controller type", (int*)&camera->controller.type, "None\0Orbit\0FPS\0\0");
+    if (ImGui::TreeNode("Camera"))
+    {
+        ImGui::DragFloat3("Position", &camera->controller.pos.x, 0.01f);
+
+        ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.21f);
+        ImGui::DragFloat("theta", &camera->controller.theta, 0.01f);
+        ImGui::SameLine();
+        ImGui::DragFloat("phi", &camera->controller.phi, 0.01f);
+        ImGui::PopItemWidth();
+
+        // ImGui::Text("front: (%.2f, %.2f, %.2f)", camera->controller.z.x, camera->controller.z.y, camera->controller.z.z);
+        // ImGui::Text("left: (%.2f, %.2f, %.2f)", camera->controller.x.x, camera->controller.x.y, camera->controller.x.z);
+        // ImGui::Text("up: (%.2f, %.2f, %.2f)", camera->controller.y.x, camera->controller.y.y, camera->controller.y.z);
+
+        ImGui::Combo("Camera Type", (int*)&camera->type, "Perspective\0Orthographic\0ThinLens\0Environment\0\0");
+        ImGui::Combo("Camera Controller Type", (int*)&camera->controller.type, "None\0Orbit\0FPS\0\0");
+
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNode("Material"))
+    {
+        
+
+        ImGui::TreePop();
+    }
 }
