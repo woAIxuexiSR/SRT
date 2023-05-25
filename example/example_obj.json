@@ -1,6 +1,6 @@
 {
     "render": {
-        "type": "interactive",
+        "type": "image",
         "output": "output.png",
         "resolution": [
             1920,
@@ -13,7 +13,7 @@
             "enable": true,
             "params": {
                 "max_depth": 16,
-                "samples_per_pixel": 4,
+                "samples_per_pixel": 1024,
                 "use_nee": true
             }
         },
@@ -24,6 +24,11 @@
                 "type": "ACES",
                 "use_gamma": true
             }
+        },
+        {
+            "enbale": true,
+            "name": "Denoise",
+            "params": {}
         }
     ],
     "scene": {

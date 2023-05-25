@@ -175,7 +175,7 @@ void PBRTParser::load_material(const string& name, const string& type, const uno
         }
     }
 
-    material->type = Material::Type::Disney;
+    material->type = Material::Type::Diffuse;
     int id = scene->add_material(material, name, texture_id);
 
     if (in_attribute) attribute_state.material_id = id;
@@ -241,11 +241,14 @@ void PBRTParser::parse()
             string t = next_bracketed();
             vector<float> v = parse_to_vector<float>(t);
             SquareMatrix<4> m(v.data());
+            Transform transform = Transform::Inverse(Transpose(m));
+            // the pbrt transform is left-handed, so we need to flip the first row
+            transform[0][0] = -transform[0][0], transform[0][1] = -transform[0][1], transform[0][2] = -transform[0][2];
 
             if (in_attribute)
-                attribute_state.transform = Transform::Inverse(Transpose(m));
+                attribute_state.transform = transform;
             else
-                global_state.transform = Transform::Inverse(Transpose(m));
+                global_state.transform = transform;
         }
         else if (token == "Sampler")
             ignore();

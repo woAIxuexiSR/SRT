@@ -102,9 +102,10 @@ void Denoise::render(shared_ptr<Film> film)
 
 void Denoise::render_ui()
 {
-    ImGui::ShowDemoWindow();
+    // ImGui::ShowDemoWindow();
 
     if (ImGui::CollapsingHeader("Denoise"))
-        if (ImGui::TreeNode("Denoise##2"))
-            ImGui::Checkbox("Denoise", &enable);
+    {
+        ImGui::Checkbox("enable", &enable);
+    }
 }

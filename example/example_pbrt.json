@@ -1,6 +1,6 @@
 {
     "render": {
-        "type": "interactive",
+        "type": "image",
         "output": "output.exr"
     },
     "passes": [
@@ -9,7 +9,7 @@
             "enable": true,
             "params": {
                 "max_depth": 16,
-                "sample_per_pixel": 128,
+                "samples_per_pixel": 128,
                 "use_nee": true
             }
         }

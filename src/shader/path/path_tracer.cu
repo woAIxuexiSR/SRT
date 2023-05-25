@@ -48,6 +48,7 @@ extern "C" __global__ void __closesthit__radiance()
 
     if (sbtData.has_texture && sbtData.texcoord)
     {
+        printf("hello\n");
         float2 tc = sbtData.texcoord[index.x] * (1.0f - uv.x - uv.y) + sbtData.texcoord[index.y] * uv.x + sbtData.texcoord[index.z] * uv.y;
         float4 tex = tex2D<float4>(sbtData.texture, tc.x, tc.y);
         prd.color = make_float3(tex.x, tex.y, tex.z);
