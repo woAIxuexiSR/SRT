@@ -1,10 +1,10 @@
-# SRT Scene Configuration File
+# SuperRay Scene Configuration File
 
-Welcome to the readme for the scene configuration file of SRT! This document serves as your comprehensive guide to understanding the structure and available options within the scene configuration file. By following this guide, you will gain the necessary knowledge to effectively build and utilize SRT for your ray tracing needs.
+Welcome to the readme for the scene configuration file of SuperRay! This document serves as your comprehensive guide to understanding the structure and available options within the scene configuration file. By following this guide, you will gain the necessary knowledge to effectively build and utilize SuperRay for your ray tracing needs.
 
 ## 1. File Structure
 
-The SRT scene configuration file is structured as a JSON document. It allows you to specify all the necessary rendering parameters.
+The SuperRay scene configuration file is structured as a JSON document. It allows you to specify all the necessary rendering parameters.
 
 The file consists of three sections: "render," "passes," and "scene." The "render" section serves to define the core parameters of the renderer. The "passes" section is dedicated to defining the render passes to be employed. Lastly, the "scene" section encompasses all the scene properties.
 
@@ -46,7 +46,7 @@ The passes section is an array of passes, where each pass is defined as an objec
 
   - **up** : The up vector of the camera as a three-dimensional vector `[x, y, z]`.
 
-  - Other properties: Contains additional properties specific to different camera types. For more detailed information, please refer to the [cameras source code](../src/device_include/scene/camera/).
+  - Other properties: Contains additional properties specific to different camera types. For more detailed information, please refer to the [cameras source code](../src/device_include/scene/camera.h).
 
 - **environment** : An object that encompasses the environment properties. Note that this section may be ignored if the file format is set to pbrt. The environment object includes the following properties:
 

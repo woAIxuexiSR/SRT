@@ -1,17 +1,16 @@
 #pragma once
 
-#include "params/launch_params.h"
+#include "params/integrator_params.h"
+#include "params/npr_params.h"
+#include "params/wavefront_params.h"
 
 struct HitInfo
 {
     bool hit;
-    
-    float3 pos;
-    float3 normal;
-    bool inner;
-    
-    const Material* mat;
-    float3 color;
 
+    float3 pos, normal, color;
+    const Material* mat;
+
+    bool inner;
     int light_id;
 };

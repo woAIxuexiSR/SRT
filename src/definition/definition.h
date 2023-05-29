@@ -79,5 +79,3 @@ inline string to_str(const T& value)
     ss << value;
     return ss.str();
 }
-
-#define LOG_ERROR(format, ...) printf("[ERROR] :" format "\n", ##__VA_ARGS__)

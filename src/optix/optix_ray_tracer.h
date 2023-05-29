@@ -51,13 +51,13 @@ public:
 
 
     template<class T>
-    void trace(int num, int idx, const GPUMemory<T>& params)
+    void trace(int num, int idx, T* params)
     {
         OPTIX_CHECK(optixLaunch(
             pipelines[idx],
             stream,
-            (CUdeviceptr)params.data(),
-            params.size() * sizeof(T),
+            (CUdeviceptr)params,
+            sizeof(T),
             &sbts[idx],
             num, 1, 1
         ));

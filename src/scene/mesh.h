@@ -30,7 +30,7 @@ public:
 };
 
 
-class AnimatedTriangleMesh: public TriangleMesh
+class AnimatedTriangleMesh : public TriangleMesh
 {
 public:
     float start_time;

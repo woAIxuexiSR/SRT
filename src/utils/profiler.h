@@ -104,7 +104,7 @@ private:
     void end_event()
     {
         string e_name = current_event;
-        if(m.find(e_name) == m.end()) return;
+        if (m.find(e_name) == m.end()) return;
         int idx = m[e_name];
         recorder[idx].end_event();
         current_event = current_event.substr(0, current_event.find_last_of("/"));
@@ -165,7 +165,21 @@ public:
 
     static void render_ui()
     {
+        auto& profiler = get_profiler();
+        if (ImGui::TreeNode("Profiler"))
+        {
+            for (auto& r : profiler.recorder)
+            {
+                string name = r.name.substr(r.name.find_last_of("/") + 1);
+                int level = std::count(r.name.begin(), r.name.end(), '/') - 1;
+                string indent = "";
+                for (int i = 0; i < level; i++) indent += "  ";
 
+                ImGui::Text("%s%s: %d times, cpu time: %.2f ms, gpu time: %.2f ms",
+                    indent.c_str(), name.c_str(), r.count, r.cpu_time, r.gpu_time);
+            }
+            ImGui::TreePop();
+        }
     }
 };
 

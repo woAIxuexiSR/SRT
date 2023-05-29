@@ -95,8 +95,8 @@ shared_ptr<TriangleMesh> PBRTParser::load_shape(const string& type, const unorde
         auto it = params.find("string filename");
         if (it == params.end())
         {
-            LOG_ERROR("No filename specified for plymesh");
-            return nullptr;
+            cout << "ERROR::No filename specified for plymesh" << endl;
+            exit(-1);
         }
         string mesh_path = (folderpath / dequote(it->second)).string();
         mesh->load_from_file(mesh_path);
@@ -106,8 +106,8 @@ shared_ptr<TriangleMesh> PBRTParser::load_shape(const string& type, const unorde
         auto it = params.find("point3 P");
         if (it == params.end())
         {
-            LOG_ERROR("No point3 P specified for trianglemesh");
-            return nullptr;
+            cout << "ERROR::No point3 P specified for trianglemesh" << endl;
+            exit(-1);
         }
         vector<float> P = parse_to_vector<float>(it->second);
         vector<float3> vertices(P.size() / 3);
@@ -116,8 +116,8 @@ shared_ptr<TriangleMesh> PBRTParser::load_shape(const string& type, const unorde
         it = params.find("integer indices");
         if (it == params.end())
         {
-            LOG_ERROR("No integer indices specified for trianglemesh");
-            return nullptr;
+            cout << "ERROR::No integer indices specified for trianglemesh" << endl;
+            exit(-1);
         }
         vector<int> I = parse_to_vector<int>(it->second);
         vector<uint3> indices(I.size() / 3);
@@ -145,8 +145,8 @@ shared_ptr<TriangleMesh> PBRTParser::load_shape(const string& type, const unorde
     }
     else
     {
-        LOG_ERROR("Unsupported shape type: %s", type.c_str());
-        return nullptr;
+        cout << "ERROR::Unsupported shape type: " << type << endl;
+        exit(-1);
     }
 
     return mesh;
@@ -170,8 +170,8 @@ void PBRTParser::load_material(const string& name, const string& type, const uno
         texture_id = scene->get_texture_id(texture_name);
         if (texture_id == -1)
         {
-            LOG_ERROR("Texture %s not found", texture_name.c_str());
-            return;
+            cout << "ERROR::Texture " << texture_name << " not found" << endl;
+            exit(-1);
         }
     }
 
@@ -187,8 +187,8 @@ void PBRTParser::load_texture(const string& name, const unordered_map<string, st
     auto it = params.find("string filename");
     if (it == params.end())
     {
-        LOG_ERROR("No filename specified for texture");
-        return;
+        cout << "ERROR::No filename specified for texture" << endl;
+        exit(-1);
     }
     string texture_path = (folderpath / dequote(it->second)).string();
 
@@ -204,15 +204,15 @@ PBRTParser::PBRTParser(const string& filename)
 
     if (filename.substr(filename.find_last_of(".") + 1) != "pbrt")
     {
-        LOG_ERROR("%s is not a pbrt file", filename.c_str());
-        return;
+        cout << "ERROR:: " << filename << " is not a pbrt file" << endl;
+        exit(-1);
     }
 
     file.open(filename);
     if (!file.is_open())
     {
-        LOG_ERROR("Failed to open file: %s", filename.c_str());
-        return;
+        cout << "ERROR::Failed to open file: " << filename << endl;
+        exit(-1);
     }
 
     global_state.reset();
@@ -242,8 +242,6 @@ void PBRTParser::parse()
             vector<float> v = parse_to_vector<float>(t);
             SquareMatrix<4> m(v.data());
             Transform transform = Transform::Inverse(Transpose(m));
-            // the pbrt transform is left-handed, so we need to flip the first row
-            transform[0][0] = -transform[0][0], transform[0][1] = -transform[0][1], transform[0][2] = -transform[0][2];
 
             if (in_attribute)
                 attribute_state.transform = transform;
@@ -282,8 +280,8 @@ void PBRTParser::parse()
             auto it = params.find("string type");
             if (it == params.end())
             {
-                LOG_ERROR("No type specified for material");
-                return;
+                cout << "ERROR::No type specified for material" << endl;
+                exit(-1);
             }
             load_material(name, dequote(it->second), params);
         }
@@ -346,7 +344,8 @@ void PBRTParser::parse()
         }
         else
         {
-            LOG_ERROR("Unsupported token: %s", token.c_str());
+            cout << "ERROR::Unsupported token: " << token << endl;
+            exit(-1);
         }
     }
 

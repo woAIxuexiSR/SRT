@@ -34,7 +34,7 @@ inline void set_material_property(shared_ptr<Material> material, const string& n
         material->params[11] = value;
     else
     {
-        cout << "ERROR::UNKNOWN_MATERIAL_PROPERTY::" << name << endl;
-        return;
+        cout << "ERROR::Unknown material property: " << name << endl;
+        exit(-1);
     }
 }

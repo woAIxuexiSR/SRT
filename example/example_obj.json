@@ -12,9 +12,11 @@
             "name": "PathTracer",
             "enable": true,
             "params": {
+                "samples_per_pixel": 128,
                 "max_depth": 16,
-                "samples_per_pixel": 1024,
-                "use_nee": true
+                "rr_depth": 4,
+                "use_nee": true,
+                "use_mis": true
             }
         },
         {
@@ -24,11 +26,6 @@
                 "type": "ACES",
                 "use_gamma": true
             }
-        },
-        {
-            "enbale": true,
-            "name": "Denoise",
-            "params": {}
         }
     ],
     "scene": {

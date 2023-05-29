@@ -83,9 +83,7 @@ public:
 
 public:
     __host__ __device__ Material() {}
-    __host__ __device__ float3 get_color() const { return color; }
-    __host__ __device__ float3 get_emission_color() const { return emission_color; }
-    __host__ __device__ float get_intensity() const { return intensity; }
+    __host__ __device__ float3 get_emission() const { return intensity * emission_color; }
 
     __host__ __device__ bool is_emissive() const { return intensity > 0.0f && length(emission_color) > 0.0f; }
     __host__ __device__ bool is_specular() const { return type == Type::Dielectric; }

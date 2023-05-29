@@ -384,8 +384,8 @@ void Scene::create_device_lights()
         if (meshes[i]->texture_id >= 0)
             area_lights[idx].texture = d_scene.texture_objects[meshes[i]->texture_id];
 
-        area_lights[idx].emission_color = materials[meshes[i]->material_id]->get_emission_color();
-        area_lights[idx].intensity = materials[meshes[i]->material_id]->get_intensity();
+        area_lights[idx].emission_color = materials[meshes[i]->material_id]->emission_color;
+        area_lights[idx].intensity = materials[meshes[i]->material_id]->intensity;
 
         int face_num = (int)meshes[i]->indices.size();
         vector<float> areas(face_num);
@@ -437,30 +437,81 @@ void Scene::render_ui()
     if (!ImGui::CollapsingHeader("Scene"))
         return;
 
+    CameraController& controller = camera->controller;
     if (ImGui::TreeNode("Camera"))
     {
-        ImGui::DragFloat3("Position", &camera->controller.pos.x, 0.01f);
+        ImGui::DragFloat3("position", &controller.pos.x, 0.01f);
+        ImGui::DragFloat3("target", &controller.target.x, 0.01f);
 
         ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.21f);
-        ImGui::DragFloat("theta", &camera->controller.theta, 0.01f);
+        bool theta = ImGui::DragFloat("theta", &controller.theta, 0.01f);
         ImGui::SameLine();
-        ImGui::DragFloat("phi", &camera->controller.phi, 0.01f);
+        bool phi = ImGui::DragFloat("phi", &controller.phi, 0.01f);
         ImGui::PopItemWidth();
+        if (theta || phi) controller.reset_from_angle();
 
-        // ImGui::Text("front: (%.2f, %.2f, %.2f)", camera->controller.z.x, camera->controller.z.y, camera->controller.z.z);
-        // ImGui::Text("left: (%.2f, %.2f, %.2f)", camera->controller.x.x, camera->controller.x.y, camera->controller.x.z);
-        // ImGui::Text("up: (%.2f, %.2f, %.2f)", camera->controller.y.x, camera->controller.y.y, camera->controller.y.z);
+        ImGui::Text("z: (%.1f, %.1f, %.1f), x: (%.1f, %.1f, %.1f), y: (%.1f, %.1f, %.1f)",
+            controller.z.x, controller.z.y, controller.z.z,
+            controller.x.x, controller.x.y, controller.x.z,
+            controller.y.x, controller.y.y, controller.y.z);
 
-        ImGui::Combo("Camera Type", (int*)&camera->type, "Perspective\0Orthographic\0ThinLens\0Environment\0\0");
-        ImGui::Combo("Camera Controller Type", (int*)&camera->controller.type, "None\0Orbit\0FPS\0\0");
+        ImGui::Combo("camera type", (int*)&camera->type, "Perspective\0Orthographic\0ThinLens\0Environment\0\0");
+        if (camera->type == Camera::Type::ThinLens)
+        {
+            ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.21f);
+            ImGui::DragFloat("focal", &camera->focal, 0.01f, 1.0f);
+            ImGui::SameLine();
+            ImGui::DragFloat("aperture", &camera->aperture, 0.01f, 0.0f);
+            ImGui::PopItemWidth();
+        }
+        ImGui::Combo("camera controller type", (int*)&controller.type, "None\0Orbit\0FPS\0\0");
 
         ImGui::TreePop();
     }
 
     if (ImGui::TreeNode("Material"))
     {
-        
+        for (int i = 0; i < (int)materials.size(); i++)
+        {
+            if (ImGui::TreeNode(material_names[i].c_str()))
+            {
+                ImGui::Combo("type", (int*)&materials[i]->type, "Diffuse\0DiffuseTransmission\0Dielectric\0Disney\0\0");
+                ImGui::ColorEdit3("color", &materials[i]->color.x);
+                if (materials[i]->is_emissive())
+                {
+                    ImGui::ColorEdit3("emission color", &materials[i]->emission_color.x);
+                    ImGui::DragFloat("intensity", &materials[i]->intensity, 0.01f);
+                }
 
+                if (materials[i]->type == Material::Type::DiffuseTransmission)
+                    ImGui::ColorEdit3("transmission color", &materials[i]->params[0]);
+                else if (materials[i]->type == Material::Type::Dielectric)
+                    ImGui::DragFloat("ior", &materials[i]->params[0], 0.01f, 0.0f, 2.0f);
+                else if (materials[i]->type == Material::Type::Disney)
+                {
+                    if (ImGui::TreeNode("disney parameters"))
+                    {
+                        ImGui::DragFloat("ior", &materials[i]->params[0], 0.01f, 0.0f, 2.0f);
+                        ImGui::DragFloat("metallic", &materials[i]->params[1], 0.01f, 0.0f, 1.0f);
+                        ImGui::DragFloat("subsurface", &materials[i]->params[2], 0.01f, 0.0f, 1.0f);
+                        ImGui::DragFloat("roughness", &materials[i]->params[3], 0.01f, 0.0f, 1.0f);
+                        ImGui::DragFloat("specular", &materials[i]->params[4], 0.01f, 0.0f, 1.0f);
+                        ImGui::DragFloat("specular tint", &materials[i]->params[5], 0.01f, 0.0f, 1.0f);
+                        // ImGui::DragFloat("anisotropic", &materials[i]->params[6], 0.01f, 0.0f, 1.0f);
+                        ImGui::DragFloat("sheen", &materials[i]->params[7], 0.01f, 0.0f, 1.0f);
+                        ImGui::DragFloat("sheen tint", &materials[i]->params[8], 0.01f, 0.0f, 1.0f);
+                        ImGui::DragFloat("clearcoat", &materials[i]->params[9], 0.01f, 0.0f, 1.0f);
+                        ImGui::DragFloat("clearcoat gloss", &materials[i]->params[10], 0.01f, 0.0f, 1.0f);
+                        ImGui::DragFloat("specular transmission", &materials[i]->params[11], 0.01f, 0.0f, 1.0f);
+
+                        ImGui::TreePop();
+                    }
+                }
+                ImGui::TreePop();
+
+                checkCudaErrors(cudaMemcpy(d_scene.material_buffer.data() + i, materials[i].get(), sizeof(Material), cudaMemcpyHostToDevice));
+            }
+        }
         ImGui::TreePop();
     }
 }

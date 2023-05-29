@@ -5,29 +5,30 @@ REGISTER_RENDER_PASS_CPP(ToneMapping);
 void ToneMapping::render(shared_ptr<Film> film)
 {
     if (!enable) return;
+    PROFILE("ToneMapping");
 
     float4* pixels = film->get_pixels();
-    ToneMappingType t = type;
-    int exp = exposure;
+    Type t = type;
+    float exp = pow(2.0f, exposure);
     bool gamma = use_gamma;
     tcnn::parallel_for_gpu(width * height, [=] __device__(int i) {
-        float3 color = make_float3(pixels[i]) * pow(2.0f, exp);
+        float3 color = make_float3(pixels[i]) * exp;
         switch (t)
         {
-        case ToneMappingType::None:
+        case Type::None:
             break;
-        case ToneMappingType::Clamp:
+        case Type::Clamp:
         {
             color = clamp(color, 0.0f, 1.0f);
             break;
         }
-        case ToneMappingType::Reinhard:
+        case Type::Reinhard:
         {
             float L = Luminance(color);
             color = color / (1.0f + L);
             break;
         }
-        case ToneMappingType::Uncharted2:
+        case Type::Uncharted2:
         {
             float A = 0.15f;
             float B = 0.50f;
@@ -41,7 +42,7 @@ void ToneMapping::render(shared_ptr<Film> film)
             color = color / white;
             break;
         }
-        case ToneMappingType::ACES:
+        case Type::ACES:
         {
             color *= 0.6f;
             float a = 2.51f;
@@ -70,5 +71,11 @@ void ToneMapping::render(shared_ptr<Film> film)
 
 void ToneMapping::render_ui()
 {
-
+    if (ImGui::CollapsingHeader("ToneMapping"))
+    {
+        ImGui::Checkbox("Enable", &enable);
+        ImGui::Combo("type", (int*)&type, "None\0Clamp\0Reinhard\0Uncharted2\0ACES\0");
+        ImGui::SliderFloat("exposure", &exposure, -10.0f, 10.0f);
+        ImGui::Checkbox("use gamma", &use_gamma);
+    }
 }

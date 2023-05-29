@@ -4,9 +4,9 @@
 #include "my_math.h"
 
 /*
-right hand coordinate system
+left hand coordinate system
     - z axis : front
-    - x axis : left
+    - x axis : right
     - y axis : up
 */
 
@@ -55,6 +55,20 @@ public:
 
     CameraController() : CameraController(Transform(), 1.0f) {}
 
+    void reset_from_angle()
+    {
+        float cos_theta = cos(Radians(theta)), sin_theta = sin(Radians(theta));
+        float cos_phi = cos(Radians(phi)), sin_phi = sin(Radians(phi));
+        z = make_float3(cos_phi * sin_theta, cos_theta, sin_phi * sin_theta);
+        x = normalize(cross(z, make_float3(0.0f, 1.0f, 0.0f)));
+        y = normalize(cross(x, z));
+
+        if (type == Type::Orbit)
+            pos = target - z * radius;
+        else
+            target = pos + z * radius;
+    }
+
     void process_keyboard_input(CameraMovement movement, float m)
     {
         switch (movement)
@@ -75,16 +89,7 @@ public:
         theta = clamp(theta + yoffset, 1.0f, 179.0f);
         phi += xoffset;
 
-        float cos_theta = cos(Radians(theta)), sin_theta = sin(Radians(theta));
-        float cos_phi = cos(Radians(phi)), sin_phi = sin(Radians(phi));
-        z = make_float3(cos_phi * sin_theta, cos_theta, sin_phi * sin_theta);
-        x = normalize(cross(make_float3(0.0f, 1.0f, 0.0f), z));
-        y = normalize(cross(z, x));
-
-        if (type == Type::Orbit)
-            pos = target - z * radius;
-        else
-            target = pos + z * radius;
+        reset_from_angle();
     }
 };
 
@@ -99,7 +104,7 @@ public:
     Type type;
     float aspect;
     float fov, nh, nw;      // for perspective, thin lens. for orthographic, scale = nw * radius
-    float focal, aperture;  // for thin lens
+    float focal{ 1.0f }, aperture{ 0.0f };  // for thin lens
 
     bool moved{ false };
 

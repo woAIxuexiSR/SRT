@@ -5,30 +5,39 @@ REGISTER_RENDER_PASS_CPP(Simple);
 void Simple::set_scene(shared_ptr<Scene> _scene)
 {
     scene = _scene;
+    params.resize(1);
+
     vector<string> ptx_files({ "simple.ptx" });
     tracer = make_shared<OptixRayTracer>(ptx_files, _scene);
 }
 
 void Simple::render(shared_ptr<Film> film)
 {
-    int seed = random_int(0, INT32_MAX);
-    Camera camera = *(scene->camera);
-    float4* pixels = film->get_pixels();
+    PROFILE("Simple");
+    SimpleParams host_params;
+    host_params.seed = random_int(0, INT32_MAX);
+    host_params.width = width;
+    host_params.height = height;
+    host_params.traversable = tracer->get_traversable();
+    host_params.camera = *(scene->camera);
+    host_params.pixels = film->get_pixels();
+    host_params.type = type;
+    host_params.samples_per_pixel = samples_per_pixel;
 
-    AABB aabb = scene->get_aabb();
-    float dist = length(aabb.get_pmax() - aabb.get_pmin());
-    dist = length(camera.controller.pos - aabb.center()) + dist / 2.0f;
+    float3 pos = scene->camera->controller.pos;
+    host_params.min_depth = scene->get_aabb().min_distance(pos);
+    host_params.max_depth = scene->get_aabb().max_distance(pos);
 
-    LaunchParams<float> params(seed, width, height, tracer->get_traversable(),
-        camera, pixels, dist);
-
-    GPUMemory<LaunchParams<float>> params_buffer;
-    params_buffer.resize_and_copy_from_host(&params, 1);
-
-    tracer->trace(width * height, 0, params_buffer);
+    params.copy_from_host(&host_params, 1);
+    tracer->trace(width * height, 0, params.data());
     checkCudaErrors(cudaDeviceSynchronize());
 }
 
 void Simple::render_ui()
 {
+    if (ImGui::CollapsingHeader("Simple"))
+    {
+        ImGui::SliderInt("samples per pixel", &samples_per_pixel, 1, 16);
+        ImGui::Combo("type", (int*)&type, "Depth\0Normal\0BaseColor\0Ambient\0FaceOrientation\0\0");
+    }
 }

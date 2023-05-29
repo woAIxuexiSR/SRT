@@ -10,11 +10,11 @@ void TriangleMesh::compute_aabb()
 
 void TriangleMesh::apply_transform(const Transform& t)
 {
-    if(t == Transform::Identity()) return;
-    
-    for(int i = 0; i < vertices.size(); i++)
+    if (t == Transform::Identity()) return;
+
+    for (int i = 0; i < vertices.size(); i++)
         vertices[i] = t.apply_point(vertices[i]);
-    for(int i = 0; i < normals.size(); i++)
+    for (int i = 0; i < normals.size(); i++)
         normals[i] = t.apply_vector(normals[i]);
     compute_aabb();
 }
@@ -25,7 +25,7 @@ void TriangleMesh::load_from_ply(const string& filename)
     if (!f.is_open())
     {
         cout << "ERROR::Failed to open file: " << filename << endl;
-        return;
+        exit(-1);
     }
 
     tinyply::PlyFile file;
@@ -47,31 +47,31 @@ void TriangleMesh::load_from_ply(const string& filename)
 
     file.read(f);
 
-    if(vertices_data)
+    if (vertices_data)
     {
         assert(vertices_data->t == tinyply::Type::FLOAT32);
         vertices.resize(vertices_data->count);
         memcpy(vertices.data(), vertices_data->buffer.get(), vertices_data->buffer.size_bytes());
     }
-    if(faces_data)
+    if (faces_data)
     {
         assert(faces_data->t == tinyply::Type::UINT32 || faces_data->t == tinyply::Type::INT32);
         indices.resize(faces_data->count);
         memcpy(indices.data(), faces_data->buffer.get(), faces_data->buffer.size_bytes());
     }
-    if(normals_data)
+    if (normals_data)
     {
         assert(normals_data->t == tinyply::Type::FLOAT32);
         normals.resize(normals_data->count);
         memcpy(normals.data(), normals_data->buffer.get(), normals_data->buffer.size_bytes());
     }
-    if(texcoords_data)
+    if (texcoords_data)
     {
         assert(texcoords_data->t == tinyply::Type::FLOAT32);
         texcoords.resize(texcoords_data->count);
         memcpy(texcoords.data(), texcoords_data->buffer.get(), texcoords_data->buffer.size_bytes());
     }
-    
+
     f.close();
 
     compute_aabb();
@@ -86,7 +86,7 @@ void TriangleMesh::load_from_others(const string& filename)
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
     {
         cout << "ERROR::ASSIMP::" << importer.GetErrorString() << endl;
-        return;
+        exit(-1);
     }
 
     assert(scene->mNumMeshes == 1);

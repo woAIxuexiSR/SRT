@@ -32,8 +32,8 @@ Camera::Type string_to_camera_type(const string& str)
     if (str == "environment")
         return Camera::Type::Environment;
 
-    LOG_ERROR("Unknown camera type: %s", str.c_str());
-    return Camera::Type::Perspective;
+    cout << "ERROR::Unknown camera type: " << str << endl;
+    exit(-1);
 }
 
 void Renderer::load_scene(const json& config)
@@ -91,7 +91,10 @@ void Renderer::load_scene(const json& config)
                 scene->load_environment_map(paths);
             }
             else
-                LOG_ERROR("Unknown environment type: %s", env_type.c_str());
+            {
+                cout << "ERROR::Unknown environment type: " << env_type << endl;
+                exit(-1);
+            }
         }
     }
 
@@ -147,8 +150,8 @@ void VideoRenderer::run()
     int result = std::system(command.c_str());
     if (result != 0)
     {
-        LOG_ERROR("Failed to create temporary_images folder");
-        return;
+        cout << "ERROR::Failed to create temporary_images folder" << endl;
+        exit(-1);
     }
 
     for (int i = 0; i < frame; i++)
@@ -165,15 +168,15 @@ void VideoRenderer::run()
     result = std::system(command.c_str());
     if (result != 0)
     {
-        LOG_ERROR("Failed to create video");
-        return;
+        cout << "ERROR::Failed to create video" << endl;
+        exit(-1);
     }
 
     command = "rm -rf temporary_images";
     result = std::system(command.c_str());
     if (result != 0)
     {
-        LOG_ERROR("Failed to remove temporary_images folder");
-        return;
+        cout << "ERROR::Failed to remove temporary_images folder" << endl;
+        exit(-1);
     }
 }

@@ -26,7 +26,7 @@ void OptixRayTracer::init_optix()
     if (num_devices == 0)
     {
         cout << "ERROR::No CUDA capable devices found!" << endl;
-        return;
+        exit(-1);
     }
     cout << "Found " << num_devices << " CUDA devices" << endl;
 
@@ -49,7 +49,7 @@ void OptixRayTracer::create_context()
     if (cu_res != CUDA_SUCCESS)
     {
         cout << "ERROR::Failed to get current CUDA context" << endl;
-        return;
+        exit(-1);
     }
 
     OPTIX_CHECK(optixDeviceContextCreate(cuda_context, 0, &context));
@@ -382,5 +382,5 @@ OptixRayTracer::OptixRayTracer(const vector<string>& _ptxfiles, shared_ptr<Scene
     cout << "Building shader binding table..." << endl;
     build_sbt();
 
-    cout << "Optix fully set up!" << endl;
+    cout << "Optix fully set up!" << endl << endl;
 }

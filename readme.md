@@ -1,6 +1,6 @@
-# SRT
+# SuperRay
 
-SRT is a powerful rendering framework based on the OptiX ray tracing engine. Its goal is to provide a simple and flexible API for building ray tracing applications, making it easier for researchers to quickly prototype new ideas and discover innovative methods.
+SuperRay is a powerful rendering framework based on the OptiX ray tracing engine. Its goal is to provide a simple and flexible API for building ray tracing applications, making it easier for researchers to quickly prototype new ideas and discover innovative methods.
 
 ## Requirements
 
@@ -10,7 +10,7 @@ SRT is a powerful rendering framework based on the OptiX ray tracing engine. Its
 
 ## Build and Run
 
-Download the SRT repository. Note that SRT uses submodules, so you need to clone the repository recursively:
+Download the SuperRay repository. Note that SuperRay uses submodules, so you need to clone the repository recursively:
 
 ```shell
 git clone --recursive https://github.com/woAIxuexiSR/SRT.git
@@ -38,7 +38,7 @@ The generated binaries will be placed in the `bin` directory. You can run the `m
 
 ## Usage
 
-SRT takes the json configuration file as input. For more information about the configuration file, please refer to the [SRT Scene Configuration File](example/readme.md).
+SuperRay takes the json configuration file as input. For more information about the configuration file, please refer to the [SuperRay Scene Configuration File](example/readme.md).
 
 ```
 Usage: main [options]

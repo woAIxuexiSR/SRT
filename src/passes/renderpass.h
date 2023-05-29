@@ -55,7 +55,7 @@ public:
         if (it == map.end())
         {
             cout << "ERROR::Render pass " << name << " not found!" << endl;
-            return nullptr;
+            exit(-1);
         }
         return it->second(params);
     }

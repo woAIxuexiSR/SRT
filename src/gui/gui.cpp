@@ -5,13 +5,13 @@ unsigned GUI::load_shader(GLenum type, string filename)
     std::fstream fs(filename, std::ios::in);
     if (!fs.is_open())
     {
-        std::cout << "ERROR::Failed to open shader file: " << filename << std::endl;
+        cout << "ERROR::Failed to open shader file: " << filename << endl;
         exit(-1);
     }
 
     std::stringstream ss;
     ss << fs.rdbuf();
-    std::string str = ss.str();
+    string str = ss.str();
     fs.close();
 
     const char* shader_source = str.c_str();
@@ -26,7 +26,7 @@ unsigned GUI::load_shader(GLenum type, string filename)
     if (!success)
     {
         glGetShaderInfoLog(shader_id, 512, nullptr, info_log);
-        std::cout << "ERROR::Compile shader failed: " << info_log << std::endl;
+        cout << "ERROR::Compile shader failed: " << info_log << endl;
         exit(-1);
     }
 
@@ -68,7 +68,7 @@ unsigned GUI::create_program(string vertex_path, string fragment_path)
     if (!success)
     {
         glGetProgramInfoLog(program, 512, nullptr, info_log);
-        std::cout << "ERROR::Link program failed: " << info_log << std::endl;
+        cout << "ERROR::Link program failed: " << info_log << endl;
         exit(-1);
     }
 
@@ -109,10 +109,10 @@ GUI::GUI(int _w, int _h, shared_ptr<Camera> _c, int n)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    window = glfwCreateWindow(_w, _h, "SRT", nullptr, nullptr);
+    window = glfwCreateWindow(_w, _h, "SuperRay", nullptr, nullptr);
     if (!window)
     {
-        std::cout << "ERROR::Failed to create window" << std::endl;
+        cout << "ERROR::Failed to create window" << endl;
         glfwTerminate();
         exit(-1);
     }
@@ -120,7 +120,7 @@ GUI::GUI(int _w, int _h, shared_ptr<Camera> _c, int n)
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
-        std::cout << "ERROR::Failed to initialize GLAD" << std::endl;
+        cout << "ERROR::Failed to initialize GLAD" << endl;
         exit(-1);
     }
 
@@ -254,7 +254,7 @@ void GUI::begin_frame()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::Begin("SRT");
+    ImGui::Begin("SuperRay");
     ImGui::Text("Application Time %.1f s", ImGui::GetTime());
     ImGui::Text("FPS %.1f", ImGui::GetIO().Framerate);
 }

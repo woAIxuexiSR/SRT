@@ -1,11 +1,14 @@
-include_directories(utils)
-include_directories(device_include)
-include_directories(definition)
-include_directories(gui)
-include_directories(scene)
-include_directories(optix)
-include_directories(passes)
-include_directories(renderer)
+include_directories(
+    "definition"
+    "device_include"
+    "gui"
+    "optix"
+    "passes"
+    "renderer"
+    "scene"
+    "utils"
+)
+
 add_subdirectory(definition)
 add_subdirectory(gui)
 add_subdirectory(scene)
@@ -14,14 +17,4 @@ add_subdirectory(passes)
 add_subdirectory(shader)
 add_subdirectory(renderer)
 
-# add_executable(hello hello.cu)
-# target_link_libraries(hello PUBLIC renderer)
-
-add_executable(main main.cu)
-target_link_libraries(main PUBLIC renderer)
-
-# add_executable(metric metric.cpp)
-# target_link_libraries(metric PUBLIC definition)
-
-add_executable(test test.cu)
-target_link_libraries(test PUBLIC renderer)
+add_subdirectory(main)

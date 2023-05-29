@@ -56,9 +56,8 @@ public:
                     normal = cross(vertices[index.y] - vertices[index.x], vertices[index.z] - vertices[index.x]);
 
                 float3 emission = emission_color;
-                if (texture)
+                if (texture && texcoords)
                 {
-                    printf("texture\n");
                     float2 texcoord = texcoords[index.x] * (1.0f - p.x - p.y) + texcoords[index.y] * p.x + texcoords[index.z] * p.y;
                     emission = make_float3(tex2D<float4>(texture, texcoord.x, texcoord.y));
                 }

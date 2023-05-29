@@ -1,12 +1,12 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include "helper_math.h"
 
 #ifdef _MSC_VER
 #include "corecrt_math_defines.h"
 #endif
 
-#include "helper_math.h"
 
 /* basic math */
 

@@ -48,6 +48,7 @@ Denoise::~Denoise()
 void Denoise::render(shared_ptr<Film> film)
 {
     if (!enable) return;
+    PROFILE("Denoise");
 
     OptixImage2D input_layer;
     input_layer.data = (CUdeviceptr)film->get_pixels();
@@ -102,10 +103,6 @@ void Denoise::render(shared_ptr<Film> film)
 
 void Denoise::render_ui()
 {
-    // ImGui::ShowDemoWindow();
-
     if (ImGui::CollapsingHeader("Denoise"))
-    {
-        ImGui::Checkbox("enable", &enable);
-    }
+        ImGui::Checkbox("Enable", &enable);
 }

@@ -28,18 +28,21 @@ void Film::save_ldr(const string& filename) const
     stbi_flip_vertically_on_write(true);
     string ext = filename.substr(filename.find_last_of(".") + 1);
     int ret = 0;
-    if(ext == "png")
+    if (ext == "png")
         ret = stbi_write_png(filename.c_str(), width, height, 4, (void*)h_u.data(), 0);
-    else if(ext == "jpg")
+    else if (ext == "jpg")
         ret = stbi_write_jpg(filename.c_str(), width, height, 4, (void*)h_u.data(), 100);
     else
     {
         cout << "ERROR::Unsupported image format: " << ext << endl;
-        return;
+        exit(-1);
     }
 
-    if(ret == 0)
+    if (ret == 0)
+    {
         cout << "ERROR::Failed to save image: " << filename << endl;
+        exit(-1);
+    }
 }
 
 void Film::save_exr(const string& filename) const
@@ -95,7 +98,10 @@ void Film::save_exr(const string& filename) const
     const char* err;
     int ret = SaveEXRImageToFile(&image, &header, filename.c_str(), &err);
     if (ret != TINYEXR_SUCCESS)
-        cout << "Failed to save image: " << filename << endl;
+    {
+        cout << "ERROR::Failed to save image: " << filename << endl;
+        exit(-1);
+    }
 
     free(header.channels);
     free(header.pixel_types);
@@ -106,10 +112,13 @@ void Film::save(const string& filename) const
 {
     string ext = filename.substr(filename.find_last_of(".") + 1);
 
-    if(ext == "exr")
+    if (ext == "exr")
         save_exr(filename);
-    else if(ext == "png" || ext == "jpg")
+    else if (ext == "png" || ext == "jpg")
         save_ldr(filename);
     else
+    {
         cout << "ERROR::Unsupported image format: " << ext << endl;
+        exit(-1);
+    }
 }
