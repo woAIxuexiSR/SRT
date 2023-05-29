@@ -4,5 +4,6 @@ build
 config
 scenes
 data
+out
 .vs
 CMakeSettings.json
