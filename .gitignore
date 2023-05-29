@@ -7,3 +7,4 @@ data
 out
 .vs
 CMakeSettings.json
+CMakePresets.json

@@ -42,16 +42,29 @@ set(CUDA_INCLUDE "${CUDA_TOOLKIT_ROOT_DIR}/include")
 set(CUDA_LIB "${CUDA_LIBRARIES}" "${CUDA_CUDA_LIBRARY}" "cuda" "cublas")
 
 # assimp
-set(ASSIMP_BUILD_ZLIB ON)       # use assimp's built-in zlib
+SET(BUILD_SHARED_LIBS OFF)
+SET(ASSIMP_BUILD_TESTS OFF)
+SET(ASSIMP_BUILD_ZLIB ON)
+SET(ASSIMP_NO_EXPORT ON)
+SET(ASSIMP_BUILD_ASSIMP_TOOLS OFF)
+# specify enabled importers for speed
+SET(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT OFF)
+SET(ASSIMP_BUILD_OBJ_IMPORTER ON)
+SET(ASSIMP_BUILD_FBX_IMPORTER ON)
+SET(ASSIMP_BUILD_GLTF_IMPORTER ON)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory("${EXTENSIONS_DIR}/assimp" EXCLUDE_FROM_ALL)
-set(ASSIMP_INCLUDE "${EXTENSIONS_DIR}/assimp/include"
-    "${EXTENSIONS_DIR}/assimp/contrib/zlib"
-    "${EXTENSIONS_BIN_DIR}/assimp/contrib/zlib")
+set(ASSIMP_INCLUDE "${EXTENSIONS_DIR}/assimp/include")
 set(ASSIMP_LIB "assimp")
 
 # stb_image
 set(STB_INCLUDE "${EXTENSIONS_DIR}/stb_image")
 # zlib
+# find_package(ZLIB REQUIRED)
+# set(ZLIB_INCLUDE "${ZLIB_INCLUDE_DIRS}")
+# set(ZLIB_LIB "${ZLIB_LIBRARIES}")
+set(ZLIB_INCLUDE "${EXTENSIONS_DIR}/assimp/contrib/zlib"
+        "${EXTENSIONS_BIN_DIR}/assimp/contrib/zlib")
 set(ZLIB_LIB zlibstatic)
 # tiny exr
 set(TINY_EXR_INCLUDE "${EXTENSIONS_DIR}/tinyexr")
@@ -130,6 +143,7 @@ list(APPEND PROJECT_INCLUDE
     ${CUDA_INCLUDE}
     ${ASSIMP_INCLUDE}
     ${STB_INCLUDE}
+    ${ZLIB_INCLUDE}
     ${TINY_EXR_INCLUDE}
     ${TINY_PLY_INCLUDE}
     ${JSON_INCLUDE}
