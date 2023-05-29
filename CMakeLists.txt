@@ -73,6 +73,8 @@ set(TINY_PLY_INCLUDE "${EXTENSIONS_DIR}/tinyply")
 set(JSON_INCLUDE "${EXTENSIONS_DIR}/json")
 
 # tiny cuda nn
+set(TCNN_BUILD_BENCHMARK OFF)
+set(TCNN_BUILD_EXAMPLES OFF)
 add_subdirectory(${EXTENSIONS_DIR}/tiny-cuda-nn EXCLUDE_FROM_ALL)
 set(TINY_CUDA_NN_INCLUDE "${EXTENSIONS_DIR}/tiny-cuda-nn/include")
 set(TINY_CUDA_NN_LIB "tiny-cuda-nn")
@@ -113,7 +115,7 @@ FUNCTION(NVCUDA_COMPILE_MODULE)
     
     # This prints the standalone NVCC command line for each CUDA file.
     # CUDAToolkit_NVCC_EXECUTABLE has been set with FindCUDAToolkit.cmake in CMake 3.17 and newer.
-    message("${CUDAToolkit_NVCC_EXECUTABLE} " "${NVCUDA_COMPILE_MODULE_NVCC_OPTIONS} " "${input} " "-o " "${output}")
+    # message("${CUDAToolkit_NVCC_EXECUTABLE} " "${NVCUDA_COMPILE_MODULE_NVCC_OPTIONS} " "${input} " "-o " "${output}")
 
     add_custom_command(
       OUTPUT  "${output}"
