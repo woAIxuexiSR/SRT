@@ -175,6 +175,36 @@ void PBRTParser::load_material(const string& name, const string& type, const uno
         }
     }
 
+    auto get_roughness = [](const json& j)->float {
+        float vroughness = j.value("float vroughness", 0.1f);
+        float uroughness = j.value("float uroughness", 0.1f);
+        float roughness = (uroughness + vroughness) * 0.5f;
+        if (j.find("float roughness") != j.end())
+            roughness = j.at("float roughness");
+        if (j.value("bool remaproughness", false))
+            roughness = roughness * roughness;
+        return roughness;
+    };
+
+    // json p(params);
+    // string type = p.at("string type");
+    // if (type == "diffuse")
+    //     material->type = Material::Type::Diffuse;
+    // else if (type == "coateddiffuse")
+    // {
+    //     material->type = Material::Type::Disney;
+    //     float roughness = get_roughness(p);
+    //     set_material_property(material, "roughness", roughness);
+    //     set_material_property(material, "clearcoat", 1.0f);
+    // }
+    // else if (type == "conductor")
+    // {
+    //     float roughness = get_roughness(p);
+    //     set_material_property(material, "roughness", roughness);
+    //     set_material_property(material, "metallic", 1.0f);
+    //     set_material_property(material, "specular", 1.0f);
+    // }
+
     material->type = Material::Type::Diffuse;
     int id = scene->add_material(material, name, texture_id);
 

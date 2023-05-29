@@ -2,6 +2,7 @@
 .editorconfig
 build
 config
+scenes
 data
 .vs
 CMakeSettings.json
