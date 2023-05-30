@@ -3,7 +3,7 @@
 #include "definition.h"
 
 #include "renderpass.h"
-#include "integrator/integrator.h"
+#include "integrator/pathtracer.h"
 #include "postprocess/accumulate.h"
 #include "postprocess/tonemapping.h"
 #include "postprocess/denoise.h"

@@ -281,7 +281,7 @@ void Scene::create_device_textures()
         tex_desc.minMipmapLevelClamp = 0;
         tex_desc.mipmapFilterMode = cudaFilterModePoint;
         tex_desc.borderColor[0] = 1.0f;
-        tex_desc.sRGB = 0;
+        tex_desc.sRGB = 1;
 
         checkCudaErrors(cudaCreateTextureObject(&d_scene.texture_objects[i], &res_desc, &tex_desc, nullptr));
     }
@@ -447,8 +447,11 @@ void Scene::render_ui()
         bool theta = ImGui::DragFloat("theta", &controller.theta, 0.01f);
         ImGui::SameLine();
         bool phi = ImGui::DragFloat("phi", &controller.phi, 0.01f);
+        ImGui::SameLine();
+        bool fov = ImGui::DragFloat("fov", &camera->fov, 0.1f);
         ImGui::PopItemWidth();
         if (theta || phi) controller.reset_from_angle();
+        if(theta || phi || fov) camera->moved = true;
 
         ImGui::Text("z: (%.1f, %.1f, %.1f), x: (%.1f, %.1f, %.1f), y: (%.1f, %.1f, %.1f)",
             controller.z.x, controller.z.y, controller.z.z,

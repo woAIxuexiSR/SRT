@@ -152,64 +152,162 @@ shared_ptr<TriangleMesh> PBRTParser::load_shape(const string& type, const unorde
     return mesh;
 }
 
-void PBRTParser::load_material(const string& name, const string& type, const unordered_map<string, string>& params)
+float3 get_float3(const json& j, const string& key)
 {
-    shared_ptr<Material> material = make_shared<Material>();
+    if (j.find(key) == j.end())
+        return { 0.0f, 0.0f, 0.0f };
+    vector<float> v = parse_to_vector<float>(j.at(key).get<string>());
+    return { v[0], v[1], v[2] };
+}
 
-    auto it = params.find("rgb reflectance");
-    if (it != params.end())
+float get_roughness(const json& j)
+{
+    float roughness = 0.0f;
+    if (j.find("float vroughness") != j.end())
     {
-        vector<float> color = parse_to_vector<float>(it->second);
-        material->color = make_float3(color[0], color[1], color[2]);
+        float vroughness = std::stof(j.value("float vroughness", "0.1"));
+        float uroughness = std::stof(j.value("float uroughness", "0.1"));
+        roughness = (vroughness + uroughness) * 0.5f;
     }
-    it = params.find("texture reflectance");
-    int texture_id = -1;
-    if (it != params.end())
+    if (j.find("float roughness") != j.end())
+        roughness = std::stof(j.at("float roughness").get<string>());
+    bool remap = j.value("bool remaproughness", "false") == "true";
+    if (remap)
+        roughness = roughness * roughness;
+    return roughness;
+}
+
+float3 get_eta(const json& j)
+{
+    if (j.find("rgb eta") != j.end())
+        return get_float3(j, "rgb eta");
+    if (j.find("float eta") != j.end())
+        return make_float3(std::stof(j.at("float eta").get<string>()));
+    if (j.find("spectrum eta") != j.end())
     {
-        string texture_name = dequote(it->second);
-        texture_id = scene->get_texture_id(texture_name);
-        if (texture_id == -1)
+        string t = dequote(j.at("spectrum eta").get<string>());
+        if (t == "metal-Ag-eta")
+            return make_float3(0.155264f, 0.116723f, 0.13838f);
+        else if (t == "metal-Al-eta")
+            return make_float3(1.657f, 0.8803f, 0.521f);
+        else
         {
-            cout << "ERROR::Texture " << texture_name << " not found" << endl;
+            cout << "ERROR::Unsupported spectrum eta: " << t << endl;
             exit(-1);
         }
     }
+    return make_float3(1.45f);
+}
 
-    auto get_roughness = [](const json& j)->float {
-        float vroughness = j.value("float vroughness", 0.1f);
-        float uroughness = j.value("float uroughness", 0.1f);
-        float roughness = (uroughness + vroughness) * 0.5f;
-        if (j.find("float roughness") != j.end())
-            roughness = j.at("float roughness");
-        if (j.value("bool remaproughness", false))
-            roughness = roughness * roughness;
-        return roughness;
-    };
+float3 get_k(const json& j)
+{
+    if (j.find("rgb k") != j.end())
+        return get_float3(j, "rgb k");
+    if (j.find("spectrum k") != j.end())
+    {
+        string t = dequote(j.at("spectrum k").get<string>());
+        if (t == "metal-Ag-k")
+            return make_float3(4.08169f, 2.48668f, 1.92051f);
+        else if (t == "metal-Al-k")
+            return make_float3(7.64116f, 6.31901f, 5.95860f);
+        else
+        {
+            cout << "ERROR::Unsupported spectrum k: " << t << endl;
+            exit(-1);
+        }
+    }
+    return make_float3(1.0f);
+}
 
-    // json p(params);
-    // string type = p.at("string type");
-    // if (type == "diffuse")
-    //     material->type = Material::Type::Diffuse;
-    // else if (type == "coateddiffuse")
-    // {
-    //     material->type = Material::Type::Disney;
-    //     float roughness = get_roughness(p);
-    //     set_material_property(material, "roughness", roughness);
-    //     set_material_property(material, "clearcoat", 1.0f);
-    // }
-    // else if (type == "conductor")
-    // {
-    //     float roughness = get_roughness(p);
-    //     set_material_property(material, "roughness", roughness);
-    //     set_material_property(material, "metallic", 1.0f);
-    //     set_material_property(material, "specular", 1.0f);
-    // }
+void PBRTParser::load_material(const string& name, const string& type, const unordered_map<string, string>& params)
+{
+    shared_ptr<Material> material = make_shared<Material>();
+    int texture_id = -1;
 
-    material->type = Material::Type::Diffuse;
+    json j(params);
+    // load texture
+    if (j.find("texture reflectance") != j.end())
+    {
+        string texname = dequote(j.at("texture reflectance"));
+        texture_id = scene->get_texture_id(texname);
+        if (texture_id == -1)
+        {
+            cout << "ERROR::Texture " << texname << " not found" << endl;
+            exit(-1);
+        }
+    }
+    // load parameters
+    if (type == "diffuse")
+    {
+        material->type = Material::Type::Diffuse;
+        float3 color = get_float3(j, "rgb reflectance");
+        material->color = color;
+    }
+    else if (type == "coateddiffuse")
+    {
+        material->type = Material::Type::Disney;
+        float3 color = get_float3(j, "rgb reflectance");
+        material->color = color;
+        float roughness = get_roughness(j);
+        set_material_property(material, "metallic", 0.5f);
+        set_material_property(material, "clearcoat", 1.0f);
+        set_material_property(material, "clearcoatGloss", roughness);
+    }
+    else if (type == "conductor")
+    {
+        material->type = Material::Type::Disney;
+        float roughness = get_roughness(j);
+        set_material_property(material, "metallic", 1.0f - roughness);
+        set_material_property(material, "roughness", roughness);
+        // float3 k = get_k(j);
+        // material->color = k;
+        material->color = make_float3(1.0f);
+        float3 eta = get_eta(j);
+        float ior = (eta.x + eta.y + eta.z) / 3.0f;
+        set_material_property(material, "ior", ior);
+        set_material_property(material, "specularTint", 1.0f);
+    }
+    else if (type == "dielectric")
+    {
+        float roughness = get_roughness(j);
+        float3 eta = get_eta(j);
+        float ior = (eta.x + eta.y + eta.z) / 3.0f;
+        set_material_property(material, "ior", ior);
+        if (roughness == 0.0f)
+            material->type = Material::Type::Dielectric;
+        else
+        {
+            material->type = Material::Type::Disney;
+            set_material_property(material, "roughness", roughness);
+            set_material_property(material, "specTrans", 1.0f);
+        }
+        material->color = make_float3(1.0f);
+    }
+    else if (type == "diffusetransmission")
+    {
+        material->type = Material::Type::DiffuseTransmission;
+        if (j.find("rgb reflectance") == j.end() || j.find("rgb transmittance") == j.end())
+        {
+            cout << "ERROR::DiffuseTransmission material must have both reflectance and transmittance" << endl;
+            exit(-1);
+        }
+        material->color = get_float3(j, "rgb reflectance");
+        float3 transmittance = get_float3(j, "rgb transmittance");
+        material->params[0] = transmittance.x;
+        material->params[1] = transmittance.y;
+        material->params[2] = transmittance.z;
+    }
+    else
+    {
+        cout << "ERROR::Unsupported material type: " << type << endl;
+        exit(-1);
+    }
+
     int id = scene->add_material(material, name, texture_id);
-
-    if (in_attribute) attribute_state.material_id = id;
-    else global_state.material_id = id;
+    if (in_attribute)
+        attribute_state.material_id = id;
+    else
+        global_state.material_id = id;
 }
 
 void PBRTParser::load_texture(const string& name, const unordered_map<string, string>& params)
@@ -271,7 +369,8 @@ void PBRTParser::parse()
             string t = next_bracketed();
             vector<float> v = parse_to_vector<float>(t);
             SquareMatrix<4> m(v.data());
-            Transform transform = Transform::Inverse(Transpose(m));
+            // Transform transform = Transform::Inverse(Transpose(m));
+            Transform transform = Transpose(m);
 
             if (in_attribute)
                 attribute_state.transform = transform;
@@ -296,7 +395,7 @@ void PBRTParser::parse()
             float fov = std::stof(params["float fov"]);
             camera->set_type(Camera::Type::Perspective);
             camera->set_aspect_fov((float)width / (float)height, fov);
-            camera_transform = global_state.transform;
+            camera_transform = Transform::Inverse(global_state.transform);
         }
         else if (token == "WorldBegin")
         {
