@@ -146,6 +146,8 @@ void InteractiveRenderer::run()
 
 void VideoRenderer::run()
 {
+    assert(frame > 0);
+    
     string command = "mkdir temporary_images";
     int result = std::system(command.c_str());
     if (result != 0)
@@ -161,7 +163,7 @@ void VideoRenderer::run()
         film->save("temporary_images/" + std::to_string(i) + ".png");
     }
 
-    command = "ffmpeg -y -framerate 60 -i temporary_images/%d.png ";
+    command = "ffmpeg -y -framerate 30 -i temporary_images/%d.png ";
     command += "-c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p ";
     command += (config_path.parent_path() / filename).string();
 
