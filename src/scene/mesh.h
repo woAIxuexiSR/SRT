@@ -2,48 +2,41 @@
 
 #include "definition.h"
 #include "my_math.h"
+#include "bone.h"
+#include "animation.h"
 
-class TriangleMesh
+// triangle mesh
+class Mesh
 {
 public:
+    enum class MotionType { Static, Rigid, Skeletal };
+
+    MotionType motion_type { MotionType::Static };
+    
     vector<float3> vertices;
     vector<uint3> indices;
     vector<float3> normals;
+    vector<float3> tangents;
     vector<float2> texcoords;
+    vector<int> bone_ids;       // vertex number * MAX_BONE_PER_VERTEX
+    vector<float> bone_weights; // vertex number * MAX_BONE_PER_VERTEX
 
-    int material_id{ -1 };
-    int texture_id{ -1 };
-
+    int material_id{-1};
     AABB aabb;
 
 public:
-    TriangleMesh() {}
-    void set_material(int _m) { material_id = _m; }
-    void set_texture(int _t) { texture_id = _t; }
+    Mesh() {}
 
-    void compute_aabb();
-    void apply_transform(const Transform& t);
-    void load_from_ply(const string& filename);
-    void load_from_others(const string& filename);
-    void load_from_file(const string& filename);
-    void load_from_triangles(const vector<float3>& _v, const vector<uint3>& _i, const vector<float3>& _n, const vector<float2>& _t);
-};
-
-
-class AnimatedTriangleMesh : public TriangleMesh
-{
-public:
-    float start_time;
-    float end_time;
-    vector<Transform> transforms;
-
-public:
-    AnimatedTriangleMesh() = default;
-
-    void set_transforms(float _s, float _e, const vector<Transform>& _t)
+    void load_from_triangles(const vector<float3>& _v, const vector<uint3>& _i, const vector<float3>& _n, const vector<float3>& _t, const vector<float2>& _tc)
     {
-        start_time = _s;
-        end_time = _e;
-        transforms = _t;
+        vertices = _v;
+        indices = _i;
+        normals = _n;
+        tangents = _t;
+        texcoords = _tc;
+
+        int num_vertices = vertices.size();
+        bone_ids.resize(num_vertices * MAX_BONE_PER_VERTEX, -1);
+        bone_weights.resize(num_vertices * MAX_BONE_PER_VERTEX, 0.0f);
     }
 };

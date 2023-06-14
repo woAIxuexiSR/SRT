@@ -4,7 +4,8 @@
 #include <curand.h>
 #include <curand_kernel.h>
 
-// device code
+/* device random generator */
+
 class RandomGenerator
 {
 private:
@@ -46,7 +47,9 @@ public:
     }
 };
 
-// host code
+/* host random generator */
+
+// [0, 1)
 __host__ inline float random_float()
 {
     static std::default_random_engine g(0);

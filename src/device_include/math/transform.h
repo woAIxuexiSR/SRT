@@ -2,9 +2,16 @@
 
 #include <cuda_runtime.h>
 #include "helper_math.h"
-#include "math/basic.h"
-#include "math/matrix.h"
-#include "math/ray.h"
+#include "basic.h"
+#include "quaternion.h"
+#include "matrix.h"
+#include "ray.h"
+
+/*
+Transform:
+1. row-major matrix
+2. right-handed coordinate system
+*/
 
 class Transform
 {
@@ -12,16 +19,18 @@ private:
     SquareMatrix<4> m;
 
 public:
-    Transform() = default;
+    __host__ __device__ Transform() {}
     __host__ __device__ Transform(const SquareMatrix<4>& _m) : m(_m) {}
     __host__ __device__ Transform(const float _m[4][4]) : Transform(SquareMatrix<4>(_m)) {}
 
+    __host__ __device__ const SquareMatrix<4>& get_matrix() const { return m; }
     __host__ __device__ const float* operator[](int i) const { return m[i]; }
     __host__ __device__ float* operator[](int i) { return m[i]; }
     __host__ __device__ Transform operator*(const Transform& other) const { return Transform(m * other.m); }
     __host__ __device__ bool operator==(const Transform& other) const { return m == other.m; }
 
-    // apply transform
+    /* apply transform */
+
     __host__ __device__ float3 apply_point(float3 p) const
     {
         return make_float3(
@@ -43,7 +52,8 @@ public:
         return Ray(apply_point(r.pos), apply_vector(r.dir));
     }
 
-    // static methods
+    /* static methods */
+
     __host__ __device__ static Transform Inverse(const Transform& t)
     {
         return Transform(::Inverse(t.m));
@@ -67,6 +77,7 @@ public:
                                          0, 0, 0, 1));
     }
 
+    // anti-clockwise rotate around x-axis
     __host__ __device__ static Transform RotateX(float angle)
     {
         float sin_angle = sin(angle);
@@ -77,6 +88,7 @@ public:
                                          0, 0, 0, 1));
     }
 
+    // anti-clockwise rotate around y-axis
     __host__ __device__ static Transform RotateY(float angle)
     {
         float sin_angle = sin(angle);
@@ -87,6 +99,7 @@ public:
                                          0, 0, 0, 1));
     }
 
+    // anti-clockwise rotate around z-axis
     __host__ __device__ static Transform RotateZ(float angle)
     {
         float sin_angle = sin(angle);
@@ -97,9 +110,9 @@ public:
                                          0, 0, 0, 1));
     }
 
+    // return camera to world transform
     __host__ __device__ static Transform LookAt(float3 pos, float3 target, float3 up)
     {
-        // return camera to world transform
         float3 z = normalize(target - pos);
         float3 x = normalize(cross(up, z));
         float3 y = cross(z, x);
@@ -107,5 +120,66 @@ public:
                                          x.y, y.y, z.y, pos.y,
                                          x.z, y.z, z.z, pos.z,
                                          0, 0, 0, 1));
+    }
+
+    // quaternion to transform, quaternion must be normalized
+    __host__ __device__ static Transform FromQuaternion(Quaternion quat)
+    {
+        float x = quat.q.x, y = quat.q.y, z = quat.q.z, w = quat.q.w;
+        float x2 = x * x, y2 = y * y, z2 = z * z;
+        float xy = x * y, xz = x * z, yz = y * z;
+        float wx = w * x, wy = w * y, wz = w * z;
+
+        return Transform(SquareMatrix<4>(
+            1.0f - 2.0f * (y2 + z2), 2.0f * (xy - wz), 2.0f * (xz + wy), 0.0f,
+            2.0f * (xy + wz), 1.0f - 2.0f * (x2 + z2), 2.0f * (yz - wx), 0.0f,
+            2.0f * (xz - wy), 2.0f * (yz + wx), 1.0f - 2.0f * (x2 + y2), 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f
+        ));
+    }
+
+    // input: translation, rotation, scale, output: transform = T * R * S
+    __host__ __device__ static Transform Compose(float3 T, Quaternion R, float3 S)
+    {
+        return Transform::Translate(T) * Transform::FromQuaternion(R) * Transform::Scale(S);
+    }
+
+    // input: translation, rotation, transform, output: transform = T * R * S ( S may contain shear )
+    __host__ __device__ static Transform Compose(float3 T, Quaternion R, Transform& S)
+    {
+        return Transform::Translate(T) * Transform::FromQuaternion(R) * S;
+    }
+
+    // input: M, output: S, R, T, where M = T * R * S ( S is not strictly a scale matrix, but a matrix with scale and shear )
+    __host__ __device__ static void Decompose(const Transform& M, float3& T, Quaternion& R, Transform& S)
+    {
+        // extract translation
+        SquareMatrix<4> Mat = M.get_matrix();
+        T = make_float3(Mat[0][3], Mat[1][3], Mat[2][3]);
+        Mat[0][3] = Mat[1][3] = Mat[2][3] = 0.0f;
+
+        // polar decomposition
+        float norm = 0.0f;
+        int count = 0;
+        SquareMatrix<4> Mk = Mat;
+        do 
+        {
+            SquareMatrix<4> Mk1 = 0.5f * (Mk + ::Inverse(Transpose(Mk)));
+
+            norm = 0.0f;
+            for(int i = 0; i < 3; i++)
+            {
+                float n = fabs(Mk1[i][0] - Mk[i][0]) + fabs(Mk1[i][1] - Mk[i][1]) + fabs(Mk1[i][2] - Mk[i][2]);
+                norm = max(norm, n);
+            }
+
+            Mk = Mk1;
+        } while(++count < 100 && norm > 1e-6f);
+
+        // extract rotation
+        R = Quaternion::FromPureRotateMatrix(Mk);
+
+        // extract scale
+        S = Transform(Inverse(Mk) * Mat);
     }
 };

@@ -1,6 +1,6 @@
 {
     "render": {
-        "type": "image",
+        "type": "interactive",
         "output": "output.png",
         "resolution": [
             1920,
@@ -12,7 +12,7 @@
             "name": "PathTracer",
             "enable": true,
             "params": {
-                "samples_per_pixel": 128,
+                "samples_per_pixel": 1,
                 "max_depth": 16,
                 "rr_depth": 4,
                 "use_nee": true,

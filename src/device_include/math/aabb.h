@@ -13,13 +13,14 @@ public:
 
     __host__ __device__ float3 center() const { return 0.5f * (pmin + pmax); }
 
-    __host__ __device__ float inside(float3 p) const
+    __host__ __device__ bool inside(float3 p) const
     {
         return p.x >= pmin.x && p.x <= pmax.x &&
                p.y >= pmin.y && p.y <= pmax.y &&
                p.z >= pmin.z && p.z <= pmax.z;
     }
 
+    // calculate the max distance from p to the AABB
     __host__ __device__ float max_distance(float3 p) const
     {
         float x = fmaxf(fabs(p.x - pmin.x), fabs(p.x - pmax.x));
@@ -28,6 +29,7 @@ public:
         return length(make_float3(x, y, z));
     }
 
+    // calculate the min distance from p to the AABB
     __host__ __device__ float min_distance(float3 p) const
     {
         if (inside(p)) return 0.0f;

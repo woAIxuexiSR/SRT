@@ -5,25 +5,33 @@
 class Onb
 {
 private:
-    float3 U, V, N;
+    float3 z, x, y;
 
 public:
-    __device__ Onb() : U({ 1, 0, 0 }), V({ 0, 1, 0 }), N({ 0, 0, 1 }) {}
+    __host__ __device__ Onb() : z({0, 0, 1}), x({1, 0, 0}), y({0, 1, 0}) {}
 
-    __device__ Onb(float3 _n) : N(_n)
+    // build from normalized normal
+    __host__ __device__ Onb(float3 _n) : z(_n)
     {
-        float3 t = (abs(N.x) > abs(N.y)) ? make_float3(0, 1, 0) : make_float3(1, 0, 0);
-        U = normalize(cross(t, N));
-        V = cross(N, U);
+        float3 t = (abs(z.x) > abs(z.y)) ? make_float3(0, 1, 0) : make_float3(1, 0, 0);
+        x = normalize(cross(t, z));
+        y = cross(z, x);
     }
 
-    __device__ float3 to_world(float3 p) const
+    // build from normalized normal and tangent
+    __host__ __device__ Onb(float3 _n, float3 _t) : z(_n)
     {
-        return p.x * U + p.y * V + p.z * N;
+        x = normalize(_t - z * dot(_t, z));
+        y = cross(z, x);
     }
 
-    __device__ float3 to_local(float3 p) const
+    __host__ __device__ float3 to_world(float3 p) const
     {
-        return make_float3(dot(p, U), dot(p, V), dot(p, N));
+        return p.x * x + p.y * y + p.z * z;
+    }
+
+    __host__ __device__ float3 to_local(float3 p) const
+    {
+        return make_float3(dot(p, x), dot(p, y), dot(p, z));
     }
 };
