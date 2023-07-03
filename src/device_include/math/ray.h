@@ -10,5 +10,5 @@ public:
     __host__ __device__ Ray() {}
 
     // build from origin and normalized direction
-    __host__ __device__ Ray(float3 _p, float3 _d): pos(_p), dir(_d) {}
+    __host__ __device__ Ray(float3 _p, float3 _d) : pos(_p), dir(_d) {}
 };

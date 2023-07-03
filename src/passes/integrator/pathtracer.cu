@@ -20,7 +20,7 @@ void PathTracer::render(shared_ptr<Film> film)
     host_params.height = height;
     host_params.traversable = tracer->get_traversable();
     host_params.camera = *(scene->camera);
-    host_params.light = scene->d_scene.light;
+    host_params.light = scene->gscene.light_buffer.data();
     host_params.pixels = film->get_pixels();
     host_params.samples_per_pixel = samples_per_pixel;
     host_params.max_depth = max_depth;

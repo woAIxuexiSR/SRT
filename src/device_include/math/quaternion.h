@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cuda_runtime.h>
 #include "matrix.h"
+#include "helper_math.h"
 
 class Quaternion
 {
@@ -58,8 +58,8 @@ public:
         return quat * (1 / Norm(quat));
     }
 
-    // angle in radians
-    __host__ __device__ static Quaternion FromAxisAngle(const float3& axis, float angle)
+    // angle in radians, axis must be normalized
+    __host__ __device__ static Quaternion FromAxisAngle(float3 axis, float angle)
     {
         float s = sin(angle / 2);
         float c = cos(angle / 2);
@@ -70,7 +70,7 @@ public:
     __host__ __device__ static Quaternion FromPureRotateMatrix(const SquareMatrix<4>& M)
     {
         float trace = M[0][0] + M[1][1] + M[2][2];     // 3 - 4 * (x2 + y2 + z2)
-        if(trace > 0.0f)
+        if (trace > 0.0f)
         {
             float s = sqrt(trace + 1.0f) * 2.0f;
             float inv_s = 1.0f / s;
@@ -83,11 +83,11 @@ public:
         else
         {
             // compute largest diagonal element (x, y, z)
-            const int nxt[3] = {1, 2, 0};
+            const int nxt[3] = { 1, 2, 0 };
             float q[3];
             int i = 0;
-            if(M[1][1] > M[0][0]) i = 1;
-            if(M[2][2] > M[i][i]) i = 2;
+            if (M[1][1] > M[0][0]) i = 1;
+            if (M[2][2] > M[i][i]) i = 2;
             int j = nxt[i], k = nxt[j];
 
             float s = sqrt((M[i][i] - (M[j][j] + M[k][k])) + 1.0f) * 2.0f;

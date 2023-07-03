@@ -22,36 +22,34 @@ extern "C" __global__ void __closesthit__radiance()
     const float2 uv = optixGetTriangleBarycentrics();
     const float3 ray_dir = optixGetWorldRayDirection();
 
-    const uint3& index = sbtData.index[prim_idx];
-    const float3& v0 = sbtData.vertex[index.x];
-    const float3& v1 = sbtData.vertex[index.y];
-    const float3& v2 = sbtData.vertex[index.z];
+    const Transform* transform = sbtData.instance->transform;
+    const GTriangleMesh* mesh = sbtData.instance->mesh;
+
+    const uint3& index = mesh->indices[prim_idx];
+    const float3& v0 = mesh->vertices[index.x];
+    const float3& v1 = mesh->vertices[index.y];
+    const float3& v2 = mesh->vertices[index.z];
 
     HitInfo& prd = *(HitInfo*)getPRD<HitInfo>();
     prd.hit = true;
-    prd.pos = v0 * (1.0f - uv.x - uv.y) + v1 * uv.x + v2 * uv.y;
-    prd.mat = sbtData.mat;
+    prd.pos = transform->apply_point(v0 * (1.0f - uv.x - uv.y) + v1 * uv.x + v2 * uv.y);
 
-    float3 norm;
-    if (sbtData.normal)
-        norm = sbtData.normal[index.x] * (1.0f - uv.x - uv.y) + sbtData.normal[index.y] * uv.x + sbtData.normal[index.z] * uv.y;
-    else
-        norm = cross(v1 - v0, v2 - v0);
-    prd.normal = normalize(norm);
-    prd.inner = false;
-    if (dot(prd.normal, ray_dir) > 0.0f)
-    {
-        prd.normal = -prd.normal;
-        prd.inner = true;
-    }
+    prd.normal = transform->apply_vector(cross(v1 - v0, v2 - v0));
+    if (dot(prd.normal, ray_dir) > 0.0f) prd.normal = -prd.normal;
 
-    prd.color = sbtData.mat->color;
-    if (sbtData.has_texture && sbtData.texcoord)
-    {
-        float2 tc = sbtData.texcoord[index.x] * (1.0f - uv.x - uv.y) + sbtData.texcoord[index.y] * uv.x + sbtData.texcoord[index.z] * uv.y;
-        float4 tex = tex2D<float4>(sbtData.texture, tc.x, tc.y);
-        prd.color = make_float3(tex.x, tex.y, tex.z);
-    }
+    float2 texcoord = uv;
+    if (mesh->texcoords)
+        texcoord = mesh->texcoords[index.x] * (1.0f - uv.x - uv.y) + mesh->texcoords[index.y] * uv.x + mesh->texcoords[index.z] * uv.y;
+    float3 shading_normal = mesh->material->shading_normal(prd.normal, texcoord);
+    shading_normal = transform->apply_vector(shading_normal);
+
+    float3 tangent = shading_normal.x > 0.1f ? make_float3(0.0f, 1.0f, 0.0f) : make_float3(1.0f, 0.0f, 0.0f);
+    if (mesh->tangents)
+        tangent = transform->apply_vector(mesh->tangents[index.x] * (1.0f - uv.x - uv.y) + mesh->tangents[index.y] * uv.x + mesh->tangents[index.z] * uv.y);
+    prd.onb = Onb(shading_normal, tangent);
+
+    prd.color = mesh->material->surface_color(texcoord);
+    prd.mat = mesh->material;
 
     prd.light_id = sbtData.light_id;
 }
@@ -112,7 +110,8 @@ extern "C" __global__ void __raygen__()
             L = info.color * (dot(info.normal, -ray.dir) * 0.5f + 0.5f);
             break;
         case SimpleParams::Type::FaceOrientation:
-            L = info.inner ? make_float3(1.0f, 0.85f, 0.0f) : make_float3(0.34f, 0.73f, 0.76f);
+            // L = info.inner ? make_float3(1.0f, 0.85f, 0.0f) : make_float3(0.34f, 0.73f, 0.76f);
+            L = make_float3(1.0f, 0.85f, 0.0f);
             break;
         }
 

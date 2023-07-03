@@ -9,6 +9,10 @@
 
 /* basic math */
 
+#define EPSILON 1e-6f
+#define FLOAT_MAX 3.402823466e+38F
+#define FLOAT_MIN -3.402823466e+38F
+
 __host__ __device__ inline float Radians(float deg)
 {
     return deg * (float)M_PI / 180.0f;
@@ -35,16 +39,16 @@ __host__ __device__ inline float3 spherical_uv_to_cartesian(float2 uv)
 }
 
 // pack pointer
-__host__ __device__ inline uint2 pack_pointer(void *ptr)
+__host__ __device__ inline uint2 pack_pointer(void* ptr)
 {
     unsigned long long p = reinterpret_cast<unsigned long long>(ptr);
     return make_uint2(static_cast<unsigned>(p >> 32), static_cast<unsigned>(p & 0xffffffff));
 }
 
-__host__ __device__ inline void *unpack_pointer(unsigned i0, unsigned i1)
+__host__ __device__ inline void* unpack_pointer(unsigned i0, unsigned i1)
 {
     unsigned long long p = static_cast<unsigned long long>(i0) << 32 | i1;
-    return reinterpret_cast<void *>(p);
+    return reinterpret_cast<void*>(p);
 }
 
 /* sample */
@@ -167,6 +171,14 @@ __host__ __device__ inline float GTR2(float n_h, float a)
     return a2 * (float)M_1_PI / (t * t);
 }
 
+__host__ __device__ inline float GTR2_aniso(float n_h, float h_x, float h_y, float ax, float ay)
+{
+    // n_h : cos(theta), h_x : sin(theta)cos(phi), h_y : sin(theta)sin(phi)
+    float a = h_x / ax, b = h_y / ay;
+    float t = a * a + b * b + n_h * n_h;
+    return (float)M_1_PI / (ax * ay * t * t);
+}
+
 __host__ __device__ inline float smithG_GGX(float n_v, float alphaG)
 {
     float a = alphaG * alphaG;
@@ -193,6 +205,11 @@ __host__ __device__ inline float3 sample_GTR2(float a, float2 sample)
     float cos_theta = clamp(sqrt(1.0f - (sin_theta * sin_theta)), 0.0f, 1.0f);
     return make_float3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
 }
+
+// __host__ __device__ inline float3 sample_GTR2_aniso(float ax, float ay, float2 sample)
+// {
+
+// }
 
 __host__ __device__ inline float3 refract(float3 i, float3 n, float eta)
 {

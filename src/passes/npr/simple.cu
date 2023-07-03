@@ -25,8 +25,8 @@ void Simple::render(shared_ptr<Film> film)
     host_params.samples_per_pixel = samples_per_pixel;
 
     float3 pos = scene->camera->controller.pos;
-    host_params.min_depth = scene->get_aabb().min_distance(pos);
-    host_params.max_depth = scene->get_aabb().max_distance(pos);
+    host_params.min_depth = scene->aabb.min_distance(pos);
+    host_params.max_depth = scene->aabb.max_distance(pos);
 
     params.copy_from_host(&host_params, 1);
     tracer->trace(width * height, 0, params.data());

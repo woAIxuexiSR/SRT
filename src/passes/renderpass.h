@@ -22,6 +22,7 @@ public:
     virtual void set_scene(shared_ptr<Scene> _scene) { scene = _scene; }
 
     virtual void render(shared_ptr<Film> film) = 0;
+    virtual void update() {};
     virtual void render_ui() {};
 };
 

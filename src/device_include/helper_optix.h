@@ -4,8 +4,10 @@
 #include <cuda_runtime.h>
 #include <optix.h>
 #include <optix_stubs.h>
+
 #include "my_math.h"
-#include "scene/material.h"
+#include "scene/gmaterial.h"
+#include "scene/gmesh.h"
 
 inline void help_optix(OptixResult res, const char* func, const char* file, const int line)
 {
@@ -45,16 +47,8 @@ struct RaygenData {};
 struct MissData {};
 struct HitgroupData
 {
-    float3* vertex;
-    uint3* index;
-    float3* normal;
-    float2* texcoord;
-
-    int mesh_id;
+    GInstance* instance;
     int light_id;
-    Material* mat;
-    bool has_texture;
-    cudaTextureObject_t texture;
 };
 
 typedef SBTRecord<RaygenData> RaygenSBTRecord;

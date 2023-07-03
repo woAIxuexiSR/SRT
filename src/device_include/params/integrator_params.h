@@ -3,7 +3,7 @@
 #include "helper_optix.h"
 #include "scene/camera.h"
 #include "scene/light.h"
-#include "scene/material.h"
+#include "scene/gmaterial.h"
 
 
 class PathTracerParams
@@ -14,7 +14,7 @@ public:
     OptixTraversableHandle traversable;
 
     Camera camera;
-    Light light;
+    Light* light;
     float4* pixels;
 
     int samples_per_pixel{ 1 };

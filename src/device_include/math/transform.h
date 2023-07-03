@@ -2,9 +2,11 @@
 
 #include <cuda_runtime.h>
 #include "helper_math.h"
+
+#include "aabb.h"
 #include "basic.h"
-#include "quaternion.h"
 #include "matrix.h"
+#include "quaternion.h"
 #include "ray.h"
 
 /*
@@ -50,6 +52,16 @@ public:
     __host__ __device__ Ray apply_ray(Ray r) const
     {
         return Ray(apply_point(r.pos), apply_vector(r.dir));
+    }
+
+    __host__ __device__ AABB apply_aabb(AABB box) const
+    {
+        AABB res;
+        float3 pmin = apply_point(box.pmin);
+        float3 pmax = apply_point(box.pmax);
+        res.pmin = make_float3(min(pmin.x, pmax.x), min(pmin.y, pmax.y), min(pmin.z, pmax.z));
+        res.pmax = make_float3(max(pmin.x, pmax.x), max(pmin.y, pmax.y), max(pmin.z, pmax.z));
+        return res;
     }
 
     /* static methods */
@@ -145,7 +157,7 @@ public:
     }
 
     // input: translation, rotation, transform, output: transform = T * R * S ( S may contain shear )
-    __host__ __device__ static Transform Compose(float3 T, Quaternion R, Transform& S)
+    __host__ __device__ static Transform Compose(float3 T, Quaternion R, const Transform& S)
     {
         return Transform::Translate(T) * Transform::FromQuaternion(R) * S;
     }
@@ -162,19 +174,19 @@ public:
         float norm = 0.0f;
         int count = 0;
         SquareMatrix<4> Mk = Mat;
-        do 
+        do
         {
             SquareMatrix<4> Mk1 = 0.5f * (Mk + ::Inverse(Transpose(Mk)));
 
             norm = 0.0f;
-            for(int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; i++)
             {
                 float n = fabs(Mk1[i][0] - Mk[i][0]) + fabs(Mk1[i][1] - Mk[i][1]) + fabs(Mk1[i][2] - Mk[i][2]);
                 norm = max(norm, n);
             }
 
             Mk = Mk1;
-        } while(++count < 100 && norm > 1e-6f);
+        } while (++count < 100 && norm > EPSILON);
 
         // extract rotation
         R = Quaternion::FromPureRotateMatrix(Mk);

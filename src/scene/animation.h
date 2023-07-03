@@ -28,7 +28,7 @@ public:
     enum class Extrapolation { Clamp, Repeat, Mirror };
 
     Interpolation itype { Interpolation::Linear };
-    Extrapolation etype { Extrapolation::Clamp };
+    Extrapolation etype { Extrapolation::Repeat };
     float duration { 0.0f };    // in seconds
     vector<KeyTranslation> translations;
     vector<KeyRotation> rotations;

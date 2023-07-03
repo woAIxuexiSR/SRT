@@ -8,7 +8,7 @@ private:
     float3 z, x, y;
 
 public:
-    __host__ __device__ Onb() : z({0, 0, 1}), x({1, 0, 0}), y({0, 1, 0}) {}
+    __host__ __device__ Onb() : z({ 0, 0, 1 }), x({ 1, 0, 0 }), y({ 0, 1, 0 }) {}
 
     // build from normalized normal
     __host__ __device__ Onb(float3 _n) : z(_n)

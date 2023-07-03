@@ -1,39 +1,30 @@
 #pragma once
 
-#include <cuda_runtime.h>
 #include "my_math.h"
+#include "gmesh.h"
 
 class LightSample
 {
 public:
     float3 pos;
     float3 normal;
+    float3 shading_normal;
     float3 emission;
     float pdf;
-
-    __host__ __device__ LightSample() {}
-    __host__ __device__ LightSample(float3 _p, float3 _n, float3 _e, float _pdf) : pos(_p), normal(_n), emission(_e), pdf(_pdf) {}
 };
 
-
-class DiffuseAreaLight
+class AreaLight
 {
 public:
-    int face_num;
-    float3* vertices;
-    uint3* indices;
-    float3* normals;
-    float2* texcoords;
-    cudaTextureObject_t texture{ 0 };
-
-    float3 emission_color;
-    float intensity;
-
-    float* areas;
-    float area_sum;
+    int face_num { 0 };
+    GInstance* instance{ nullptr };
+    float* areas{ nullptr };
+    float area_sum{ 0 };
 
 public:
-    __host__ __device__ DiffuseAreaLight() {}
+    AreaLight() {}
+    AreaLight(int _n, GInstance* _m, float* _a, float _s)
+        : face_num(_n), instance(_m), areas(_a), area_sum(_s) {}
 
     __device__ LightSample sample(float2 rnd)
     {
@@ -45,24 +36,27 @@ public:
             {
                 rnd.x = clamp((s - sum) / areas[i], 0.0f, 1.0f);
                 float2 p = uniform_sample_triangle(rnd);
-                uint3& index = indices[i];
 
-                float3 pos = vertices[index.x] * (1.0f - p.x - p.y) + vertices[index.y] * p.x + vertices[index.z] * p.y;
+                GTriangleMesh* mesh = instance->mesh;
+                uint3& index = mesh->indices[i];
+
+                float3 pos = mesh->vertices[index.x] * (1.0f - p.x - p.y) + mesh->vertices[index.y] * p.x + mesh->vertices[index.z] * p.y;
 
                 float3 normal;
-                if (normals)
-                    normal = normals[index.x] * (1.0f - p.x - p.y) + normals[index.y] * p.x + normals[index.z] * p.y;
+                if (mesh->normals)
+                    normal = mesh->normals[index.x] * (1.0f - p.x - p.y) + mesh->normals[index.y] * p.x + mesh->normals[index.z] * p.y;
                 else
-                    normal = cross(vertices[index.y] - vertices[index.x], vertices[index.z] - vertices[index.x]);
+                    normal = cross(mesh->vertices[index.y] - mesh->vertices[index.x], mesh->vertices[index.z] - mesh->vertices[index.x]);
 
-                float3 emission = emission_color;
-                if (texture && texcoords)
-                {
-                    float2 texcoord = texcoords[index.x] * (1.0f - p.x - p.y) + texcoords[index.y] * p.x + texcoords[index.z] * p.y;
-                    emission = make_float3(tex2D<float4>(texture, texcoord.x, texcoord.y));
-                }
+                float2 texcoord;
+                if (mesh->texcoords)
+                    texcoord = mesh->texcoords[index.x] * (1.0f - p.x - p.y) + mesh->texcoords[index.y] * p.x + mesh->texcoords[index.z] * p.y;
 
-                return LightSample(pos, normalize(normal), emission * intensity, sample_pdf());
+                float3 shading_normal = mesh->material->shading_normal(normal, texcoord);
+                float3 emission = mesh->material->emission(texcoord);
+
+                Transform* t = instance->transform;
+                return { t->apply_point(pos), t->apply_vector(normal), t->apply_vector(shading_normal), emission, sample_pdf() };
             }
             sum += areas[i];
         }
@@ -70,7 +64,7 @@ public:
     }
 
     // sample proportional to area
-    __device__ inline float sample_pdf()
+    __device__ float sample_pdf()
     {
         return 1.0f / area_sum;
     }
@@ -80,14 +74,16 @@ public:
 class EnvironmentLight
 {
 public:
-    enum class Type { Constant, UVMap, CubeMap, };
+    enum class Type { Constant, UVMap };
 
     Type type{ Type::Constant };
     float3 emission_color{ 0.0f, 0.0f, 0.0f };
     cudaTextureObject_t texture{ 0 };
 
 public:
-    __host__ __device__ EnvironmentLight() {}
+    EnvironmentLight() {}
+    EnvironmentLight(Type _t, float3 _c, cudaTextureObject_t _tex = 0)
+        : type(_t), emission_color(_c), texture(_tex) {}
 
     __device__ float3 emission(float3 dir)
     {
@@ -100,30 +96,28 @@ public:
             // world space y axis is up, math space z axis is up
             float3 math_space_dir = make_float3(-dir.x, dir.z, dir.y);
             float2 phi_theta = cartesian_to_spherical_uv(math_space_dir);
-            float2 uv = make_float2(phi_theta.x * 0.5f * M_1_PI + 0.5f, phi_theta.y * M_1_PI);
+            float2 uv = make_float2(phi_theta.x * 0.5f * (float)M_1_PI + 0.5f, phi_theta.y * (float)M_1_PI);
             return make_float3(tex2D<float4>(texture, uv.x, uv.y));
         }
-        case Type::CubeMap:
-            return make_float3(texCubemap<float4>(texture, dir.x, dir.y, dir.z));
         default:
             return { 0.0f, 0.0f, 0.0f };
         }
     }
 };
 
-
-// many diffuse area lights and one infinite light
+// many area lights and one environment light
 class Light
 {
 public:
     int num;
-    DiffuseAreaLight* lights;
-    float weight_sum;
+    AreaLight* lights{ nullptr };
+    float weight_sum{ 0.0f };
 
-    EnvironmentLight* environment;
+    EnvironmentLight* env_light{ nullptr };
 
 public:
-    __host__ __device__ Light() {}
+    Light(int _n, AreaLight* _l, float _s, EnvironmentLight* _e = nullptr)
+        : num(_n), lights(_l), weight_sum(_s), env_light(_e) {}
 
     __device__ LightSample sample(float2 rnd)
     {
@@ -131,7 +125,7 @@ public:
         float sum = 0.0f;
         for (int i = 0; i < num; i++)
         {
-            float wi = lights[i].area_sum * lights[i].intensity;
+            float wi = lights[i].area_sum * lights[i].instance->mesh->material->intensity;
             if (s <= sum + wi || i == num - 1)
             {
                 rnd.x = clamp((s - sum) / wi, 0.0f, 1.0f);
@@ -141,18 +135,19 @@ public:
             }
             sum += wi;
         }
-
         return LightSample();
     }
 
     // sample proportional to area * intensity
     __device__ float sample_pdf(int idx)
     {
-        return lights[idx].intensity / weight_sum;
+        return lights[idx].instance->mesh->material->intensity / weight_sum;
     }
 
     __device__ float3 environment_emission(float3 dir)
     {
-        return environment->emission(dir);
+        if (env_light)
+            return env_light->emission(dir);
+        return { 0.0f, 0.0f, 0.0f };
     }
 };

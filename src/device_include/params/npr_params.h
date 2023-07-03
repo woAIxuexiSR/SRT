@@ -3,7 +3,8 @@
 #include "helper_optix.h"
 #include "scene/camera.h"
 #include "scene/light.h"
-#include "scene/material.h"
+#include "scene/gmaterial.h"
+#include "scene/gmesh.h"
 
 
 class SimpleParams

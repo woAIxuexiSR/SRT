@@ -4,12 +4,17 @@
 #include "params/npr_params.h"
 #include "params/wavefront_params.h"
 
-struct HitInfo
+class HitInfo
 {
+public:
     bool hit;
 
-    float3 pos, normal, color;
-    const Material* mat;
+    float3 pos;
+    float3 normal;
+    float2 texcoord;
+    Onb onb;    // build from shading normal
+    float3 color;
+    const GMaterial* mat;
 
     bool inner;
     int light_id;

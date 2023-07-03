@@ -10,6 +10,7 @@
 
 #include "gui.h"
 #include "pbrtparse.h"
+#include "assimp.h"
 
 
 class Renderer

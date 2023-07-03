@@ -1,16 +1,9 @@
 #pragma once
 
-#include "definition.h"
-#include "helper_optix.h"
-#include "helper_cuda.h"
-#include "my_math.h"
-
 #include "scene.h"
 
-#include "scene/camera.h"
-#include "scene/material.h"
-#include "scene/light.h"
-
+#include "helper_optix.h"
+#include "helper_cuda.h"
 
 class OptixRayTracer
 {
@@ -28,8 +21,11 @@ protected:
     vector<OptixPipeline> pipelines;
 
     // traversable
-    OptixTraversableHandle traversable;
-    GPUMemory<unsigned char> as_buffer;
+    vector<OptixTraversableHandle> gas_traversable;
+    vector<OptixInstance> ias_instances;
+    OptixTraversableHandle ias_traversable;
+    vector<GPUMemory<unsigned char> > gas_buffer;
+    GPUMemory<unsigned char> ias_buffer;
 
     // sbt
     vector<OptixShaderBindingTable> sbts;
@@ -42,13 +38,15 @@ private:
     void create_context();
     void create_module(const string& ptx);
     void create_pipeline(const vector<string>& ptxs);
-    void build_as();
+    OptixTraversableHandle build_as_from_input(const vector<OptixBuildInput>& inputs, GPUMemory<unsigned char>& as_buffer, bool update);
+    void build_gas();
+    void build_ias();
     void build_sbt();
 
 public:
     OptixRayTracer(const vector<string>& _ptxfiles, shared_ptr<Scene> _scene);
-    OptixTraversableHandle get_traversable() const { return traversable; }
-
+    OptixTraversableHandle get_traversable() const { return ias_traversable; }
+    void update_as();
 
     template<class T>
     void trace(int num, int idx, T* params)

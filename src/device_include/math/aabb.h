@@ -1,14 +1,14 @@
 #pragma once
 
-#include <cuda_runtime.h>
+#include "basic.h"
 
 class AABB
 {
-private:
+public:
     float3 pmin, pmax;
 
 public:
-    __host__ __device__ AABB() {}
+    __host__ __device__ AABB() : pmin(make_float3(FLOAT_MAX)), pmax(make_float3(FLOAT_MIN)) {}
     __host__ __device__ AABB(const float3& p) : pmin(p), pmax(p) {}
 
     __host__ __device__ float3 center() const { return 0.5f * (pmin + pmax); }

@@ -204,53 +204,21 @@ void OptixRayTracer::create_pipeline(const vector<string>& ptxs)
     }
 }
 
-void OptixRayTracer::build_as()
+OptixTraversableHandle OptixRayTracer::build_as_from_input(const vector<OptixBuildInput>& inputs, GPUMemory<unsigned char>& as_buffer, bool update)
 {
-    int mesh_num = (int)scene->meshes.size();
-    DeviceSceneData& d_scene = scene->d_scene;
-
-    vector<OptixBuildInput> triangle_input(mesh_num);
-    vector<CUdeviceptr> d_vertices(mesh_num);
-    vector<CUdeviceptr> d_indices(mesh_num);
-    vector<uint32_t> triangle_input_flags(mesh_num);
-
-    for (int i = 0; i < mesh_num; i++)
-    {
-        triangle_input[i] = {};
-        triangle_input[i].type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
-
-        d_vertices[i] = (CUdeviceptr)d_scene.vertex_buffer[i].data();
-        d_indices[i] = (CUdeviceptr)d_scene.index_buffer[i].data();
-
-        triangle_input[i].triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
-        triangle_input[i].triangleArray.vertexStrideInBytes = sizeof(float3);
-        triangle_input[i].triangleArray.numVertices = (unsigned)scene->meshes[i]->vertices.size();
-        triangle_input[i].triangleArray.vertexBuffers = &d_vertices[i];
-
-        triangle_input[i].triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-        triangle_input[i].triangleArray.indexStrideInBytes = sizeof(int3);
-        triangle_input[i].triangleArray.numIndexTriplets = (unsigned)scene->meshes[i]->indices.size();
-        triangle_input[i].triangleArray.indexBuffer = d_indices[i];
-
-        triangle_input_flags[i] = OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT;
-        triangle_input[i].triangleArray.flags = &triangle_input_flags[i];
-        triangle_input[i].triangleArray.numSbtRecords = 1;
-        triangle_input[i].triangleArray.sbtIndexOffsetBuffer = 0;
-        triangle_input[i].triangleArray.sbtIndexOffsetSizeInBytes = 0;
-        triangle_input[i].triangleArray.sbtIndexOffsetStrideInBytes = 0;
-    }
-
     OptixAccelBuildOptions accel_options = {};
-    accel_options.buildFlags = OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
+    accel_options.buildFlags = OPTIX_BUILD_FLAG_ALLOW_UPDATE
+        | OPTIX_BUILD_FLAG_ALLOW_COMPACTION
+        | OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
     accel_options.motionOptions.numKeys = 1;  // disable motion
-    accel_options.operation = OPTIX_BUILD_OPERATION_BUILD;
+    accel_options.operation = update ? OPTIX_BUILD_OPERATION_UPDATE : OPTIX_BUILD_OPERATION_BUILD;
 
     OptixAccelBufferSizes blas_buffer_sizes;
     OPTIX_CHECK(optixAccelComputeMemoryUsage(
         context,
         &accel_options,
-        triangle_input.data(),
-        (unsigned)mesh_num,
+        inputs.data(),
+        (unsigned)inputs.size(),
         &blas_buffer_sizes
     ));
 
@@ -262,12 +230,13 @@ void OptixRayTracer::build_as()
     GPUMemory<unsigned char> temp_buffer(blas_buffer_sizes.tempSizeInBytes);
     GPUMemory<unsigned char> output_buffer(blas_buffer_sizes.outputSizeInBytes);
 
+    OptixTraversableHandle traversable{ 0 };
     OPTIX_CHECK(optixAccelBuild(
         context,
         stream,
         &accel_options,
-        triangle_input.data(),
-        (unsigned)mesh_num,
+        inputs.data(),
+        (unsigned)inputs.size(),
         (CUdeviceptr)temp_buffer.data(),
         blas_buffer_sizes.tempSizeInBytes,
         (CUdeviceptr)output_buffer.data(),
@@ -291,6 +260,75 @@ void OptixRayTracer::build_as()
         &traversable
     ));
     checkCudaErrors(cudaDeviceSynchronize());
+
+    return traversable;
+}
+
+void OptixRayTracer::build_gas()
+{
+    int mesh_num = (int)scene->meshes.size();
+    GScene& gscene = scene->gscene;
+
+    vector<OptixBuildInput> triangle_input(mesh_num);
+    vector<CUdeviceptr> d_vertices(mesh_num);
+    vector<CUdeviceptr> d_indices(mesh_num);
+    vector<uint32_t> triangle_input_flags(mesh_num);
+
+    gas_traversable.resize(mesh_num);
+    gas_buffer.resize(mesh_num);
+
+    for (int i = 0; i < mesh_num; i++)
+    {
+        triangle_input[i] = {};
+        triangle_input[i].type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+
+        d_vertices[i] = (CUdeviceptr)gscene.animated_vertex_buffer[i].data();
+        d_indices[i] = (CUdeviceptr)gscene.index_buffer[i].data();
+
+        triangle_input[i].triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
+        triangle_input[i].triangleArray.vertexStrideInBytes = sizeof(float3);
+        triangle_input[i].triangleArray.numVertices = (unsigned)scene->meshes[i]->vertices.size();
+        triangle_input[i].triangleArray.vertexBuffers = &d_vertices[i];
+
+        triangle_input[i].triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+        triangle_input[i].triangleArray.indexStrideInBytes = sizeof(int3);
+        triangle_input[i].triangleArray.numIndexTriplets = (unsigned)scene->meshes[i]->indices.size();
+        triangle_input[i].triangleArray.indexBuffer = d_indices[i];
+
+        triangle_input_flags[i] = OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT;
+        triangle_input[i].triangleArray.flags = &triangle_input_flags[i];
+        triangle_input[i].triangleArray.numSbtRecords = 1;
+        triangle_input[i].triangleArray.sbtIndexOffsetBuffer = 0;
+        triangle_input[i].triangleArray.sbtIndexOffsetSizeInBytes = 0;
+        triangle_input[i].triangleArray.sbtIndexOffsetStrideInBytes = 0;
+
+        gas_traversable[i] = build_as_from_input({ triangle_input[i] }, gas_buffer[i], false);
+    }
+}
+
+void OptixRayTracer::build_ias()
+{
+    int instance_num = (int)scene->instances.size();
+
+    ias_instances.resize(instance_num);
+    for (int i = 0; i < instance_num; i++)
+    {
+        ias_instances[i].instanceId = i;
+        ias_instances[i].sbtOffset = i * RAY_TYPE_COUNT;
+        ias_instances[i].visibilityMask = 255;
+        ias_instances[i].flags = OPTIX_INSTANCE_FLAG_NONE;
+        ias_instances[i].traversableHandle = gas_traversable[scene->instances[i]];
+        memcpy(ias_instances[i].transform, &(scene->instance_transforms[i]), sizeof(float) * 12);
+    }
+
+    GPUMemory<OptixInstance> d_instances;
+    d_instances.resize_and_copy_from_host(ias_instances);
+
+    OptixBuildInput instance_input = {};
+    instance_input.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
+    instance_input.instanceArray.numInstances = instance_num;
+    instance_input.instanceArray.instances = (CUdeviceptr)d_instances.data();
+    ias_traversable = build_as_from_input({ instance_input }, ias_buffer, false);
 }
 
 void OptixRayTracer::build_sbt()
@@ -300,7 +338,7 @@ void OptixRayTracer::build_sbt()
     miss_sbt.resize(module_pgs.size());
     hitgroup_sbt.resize(module_pgs.size());
 
-    DeviceSceneData& d_scene = scene->d_scene;
+    GScene& gscene = scene->gscene;
 
     for (int i = 0; i < module_pgs.size(); i++)
     {
@@ -310,7 +348,7 @@ void OptixRayTracer::build_sbt()
         sbts[i].raygenRecord = (CUdeviceptr)raygen_sbt[i].data();
 
         vector<MissSBTRecord> miss_records;
-        for (int j = 0; j < 2; j++)
+        for (int j = 0; j < RAY_TYPE_COUNT; j++)
         {
             MissSBTRecord miss_record;
             OPTIX_CHECK(optixSbtRecordPackHeader(module_pgs[i].missPGs[j], &miss_record));
@@ -321,30 +359,17 @@ void OptixRayTracer::build_sbt()
         sbts[i].missRecordStrideInBytes = sizeof(MissSBTRecord);
         sbts[i].missRecordCount = (unsigned)miss_records.size();
 
-        int mesh_num = (int)scene->meshes.size();
+        int instance_num = (int)scene->instances.size();
         vector<HitgroupSBTRecord> hitgroup_records;
-        for (int k = 0; k < mesh_num; k++)
+        for (int k = 0; k < instance_num; k++)
         {
-            for (int j = 0; j < 2; j++)
+            for (int j = 0; j < RAY_TYPE_COUNT; j++)
             {
                 HitgroupSBTRecord hitgroup_record;
                 OPTIX_CHECK(optixSbtRecordPackHeader(module_pgs[i].hitgroupPGs[j], &hitgroup_record));
 
-                hitgroup_record.data.vertex = (float3*)d_scene.vertex_buffer[k].data();
-                hitgroup_record.data.index = (uint3*)d_scene.index_buffer[k].data();
-                hitgroup_record.data.normal = (float3*)d_scene.normal_buffer[k].data();
-                hitgroup_record.data.texcoord = (float2*)d_scene.texcoord_buffer[k].data();
-                hitgroup_record.data.mesh_id = k;
-                hitgroup_record.data.light_id = d_scene.meshid_to_lightid[k];
-                hitgroup_record.data.mat = d_scene.material_buffer.data() + scene->meshes[k]->material_id;
-
-                if (scene->meshes[k]->texture_id >= 0)
-                {
-                    hitgroup_record.data.has_texture = true;
-                    hitgroup_record.data.texture = d_scene.texture_objects[scene->meshes[k]->texture_id];
-                }
-                else
-                    hitgroup_record.data.has_texture = false;
+                hitgroup_record.data.instance = gscene.instance_buffer.data() + k;
+                hitgroup_record.data.light_id = gscene.instance_light_id[k];
 
                 hitgroup_records.push_back(hitgroup_record);
             }
@@ -376,11 +401,31 @@ OptixRayTracer::OptixRayTracer(const vector<string>& _ptxfiles, shared_ptr<Scene
     }
     create_pipeline(ptxs);
 
-    cout << "Building acceleration structure..." << endl;
-    build_as();
+    cout << "Building geometry acceleration structure..." << endl;
+    build_gas();
+
+    cout << "Building instance acceleration structure..." << endl;
+    build_ias();
 
     cout << "Building shader binding table..." << endl;
     build_sbt();
 
     cout << "Optix fully set up!" << endl << endl;
+}
+
+void OptixRayTracer::update_as()
+{
+    int instance_num = (int)scene->instances.size();
+
+    for (int i = 0; i < instance_num; i++)
+        memcpy(ias_instances[i].transform, &(scene->instance_transforms[i]), sizeof(float) * 12);
+
+    GPUMemory<OptixInstance> d_instances;
+    d_instances.resize_and_copy_from_host(ias_instances);
+
+    OptixBuildInput instance_input = {};
+    instance_input.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
+    instance_input.instanceArray.numInstances = instance_num;
+    instance_input.instanceArray.instances = (CUdeviceptr)d_instances.data();
+    ias_traversable = build_as_from_input({ instance_input }, ias_buffer, false);
 }

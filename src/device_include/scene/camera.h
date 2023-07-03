@@ -1,12 +1,11 @@
 #pragma once
 
-#include <cuda_runtime.h>
 #include "my_math.h"
 
 /*
-left hand coordinate system
+right hand coordinate system
     - z axis : front
-    - x axis : right
+    - x axis : left
     - y axis : up
 */
 
@@ -15,11 +14,12 @@ enum class CameraMovement { UP, DOWN, LEFT, RIGHT, FORWARD, BACKWARD };
 class CameraController
 {
 public:
-    enum class Type { None, Orbit, FPS };
+    enum class Type { Orbit, FPS };
 
     Type type;
     float3 pos, target;
     float3 z, x, y;
+
     float phi, theta;   // z axis's spherical coordinate, in world space, in degree
     float radius;       // distance between pos and target
 
@@ -39,7 +39,8 @@ public:
         return Ray(p, d);
     }
 
-    // host function
+    /* host functions */
+
     CameraController(const Transform& t, float _r, Type _t = Type::Orbit)
         : type(_t), radius(_r)
     {
@@ -49,19 +50,19 @@ public:
         z = make_float3(t[0][2], t[1][2], t[2][2]);
         target = pos + z * radius;
 
-        phi = Degrees(atan2(z.z, z.x));
-        theta = Degrees(acos(z.y));
+        phi = Degrees(atan2(z.z, z.x)); // phi is in [-180, 180], angle between projected z and (1, 0, 0)
+        theta = Degrees(acos(z.y));     // theta is in [0, 180], angle between z and (0, 1, 0)
     }
 
     CameraController() : CameraController(Transform(), 1.0f) {}
 
-    void reset_from_angle()
+    void reset()
     {
         float cos_theta = cos(Radians(theta)), sin_theta = sin(Radians(theta));
         float cos_phi = cos(Radians(phi)), sin_phi = sin(Radians(phi));
-        z = make_float3(cos_phi * sin_theta, cos_theta, sin_phi * sin_theta);
-        x = normalize(cross(z, make_float3(0.0f, 1.0f, 0.0f)));
-        y = normalize(cross(x, z));
+        z = make_float3(sin_theta * cos_phi, cos_theta, sin_theta * sin_phi);
+        x = make_float3(sin_phi, 0.0f, -cos_phi);   // cross((0, 1, 0), z)
+        y = make_float3(-cos_theta * cos_phi, sin_theta, -cos_theta * sin_phi); // cross(z, x)
 
         if (type == Type::Orbit)
             pos = target - z * radius;
@@ -75,8 +76,8 @@ public:
         {
         case CameraMovement::UP: pos += y * m; target += y * m; break;
         case CameraMovement::DOWN: pos -= y * m; target -= y * m; break;
-        case CameraMovement::LEFT: pos -= x * m; target -= x * m; break;
-        case CameraMovement::RIGHT: pos += x * m; target += x * m; break;
+        case CameraMovement::LEFT: pos += x * m; target += x * m; break;
+        case CameraMovement::RIGHT: pos -= x * m; target -= x * m; break;
         case CameraMovement::FORWARD: pos += z * m; target += z * m; break;
         case CameraMovement::BACKWARD: pos -= z * m; target -= z * m; break;
         }
@@ -84,17 +85,13 @@ public:
 
     void process_mouse_input(float xoffset, float yoffset)
     {
-        if (type == Type::None) return;
-
         theta = clamp(theta + yoffset, 1.0f, 179.0f);
         phi += xoffset;
-
-        reset_from_angle();
+        reset();
     }
 };
 
-
-// film plane is at z = -1
+/* face to z axis, film plane is at z = -1 */
 class Camera
 {
 public:
@@ -102,33 +99,34 @@ public:
 
     CameraController controller;
     Type type;
-    float aspect;
-    float fov, nh, nw;      // for perspective, thin lens. for orthographic, scale = nw * radius
-    float focal{ 1.0f }, aperture{ 0.0f };  // for thin lens
+    float aspect, fov;          // fov : in degree, vertical
+    float aperture, focal;      // thin lens
 
-    bool moved{ false };
+    float nh, nw;               // height and width of film plane
+    bool moved{ false };        // moved flag
 
 public:
     __device__ Ray get_ray(float x, float y, RandomGenerator& rng) const
     {
+        float2 p = make_float2((x - 0.5f) * nw, (y - 0.5f) * nh);
+
         switch (type)
         {
-        case Type::Perspective:
+        case Type::Perspective:             // automatically flip y
         {
-            float3 dir = normalize(make_float3((x - 0.5f) * nw, (y - 0.5f) * nh, 1.0f));
-            return controller.to_world(Ray(make_float3(0.0f), dir));
+            Ray ray(make_float3(0.0f), normalize(make_float3(p, 1.0f)));
+            return controller.to_world(ray);
         }
-        case Type::Orthographic:
+        case Type::Orthographic:            // approximate size
         {
-            float radius = controller.radius;
-            float3 pos = make_float3((x - 0.5f) * nw * radius, (y - 0.5f) * nh * radius, 0.0f);
-            return controller.to_world(Ray(pos, make_float3(0.0f, 0.0f, 1.0f)));
+            Ray ray(make_float3(p * controller.radius, 1.0f), make_float3(0.0f, 0.0f, 1.0f));
+            return controller.to_world(ray);
         }
         case Type::ThinLens:
         {
             float2 uv = uniform_sample_disk(rng.random_float2());
             float3 pos = make_float3(uv * aperture, 0.0f);
-            float3 target = make_float3((x - 0.5f) * nw, (y - 0.5f) * nh, 1.0f) * focal;
+            float3 target = make_float3(p, 1.0f) * focal;
             return controller.to_world(Ray(pos, normalize(target - pos)));
         }
         case Type::Environment:
@@ -143,59 +141,33 @@ public:
         }
     }
 
-    __device__ float2 get_xy(float3 dir) const
+    // only support perspective, the ray must pass through the camera center in reverse direction
+    __device__ float2 get_xy(Ray ray) const
     {
-        // float cost_dir = dot(front, dir);
-        // if (cost_dir < 0.0f)
-        //     return thrust::make_pair(-1.0f, -1.0f);
-        // float3 f = front * cost_dir;
-        // float3 v = (dir - f) * cost_dir / dot(f, dir);
-        // float x = dot(v, horizontal) / dot(horizontal, horizontal) + 0.5f;
-        // float y = dot(v, vertical) / dot(vertical, vertical) + 0.5f;
-        // return thrust::make_pair(x, y);
-        return { 0.0f, 0.0f };
+        ray = controller.to_local(ray);
+        float2 p = make_float2(ray.dir.x, ray.dir.y) / ray.dir.z;
+        return make_float2(p.x / nw + 0.5f, p.y / nh + 0.5f);
     }
 
-    // host function
-    Camera() {}
+    /* host functions */
 
-    void set_type(Type _t) { type = _t; }
-    void set_aspect_fov(float _aspect, float _fov)
+    Camera() : controller(), type(Type::Perspective), aspect(1.0f), fov(60.0f), aperture(0.0f), focal(1.0f)
     {
-        aspect = _aspect;
-        fov = _fov;
-        nw = 2.0f * tan(Radians(fov * 0.5f));
-        nh = nw / aspect;
-    }
-    void set_controller(const Transform& camera_to_world, float _r,
-        CameraController::Type _t = CameraController::Type::Orbit)
-    {
-        controller = CameraController(camera_to_world, _r, _t);
-    }
-    void set_focal_aperture(float _focal, float _aperture)
-    {
-        focal = _focal;
-        aperture = _aperture;
+        reset();
     }
 
+    void set_moved(bool _moved) { moved = _moved; }
 
-    void process_keyboard_input(CameraMovement movement, float m)
+    void reset()
     {
-        controller.process_keyboard_input(movement, m);
-        moved = true;
-    }
-
-    void process_mouse_input(float xoffset, float yoffset)
-    {
-        controller.process_mouse_input(xoffset, yoffset);
+        nh = 2.0f * tan(Radians(fov * 0.5f));
+        nw = nh * aspect;
         moved = true;
     }
 
     void process_scroll_input(float yoffset)
     {
         fov = clamp(fov - yoffset, 1.0f, 90.0f);
-        nw = 2.0f * tan(Radians(fov * 0.5f));
-        nh = nw / aspect;
-        moved = true;
+        reset();
     }
 };

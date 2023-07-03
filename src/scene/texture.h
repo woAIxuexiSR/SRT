@@ -36,5 +36,5 @@ class Texture
 {
 public:
     string name;
-    shared_ptr<Image> image;
+    Image image;
 };

@@ -50,8 +50,8 @@ public:
 
     __host__ __device__ SquareMatrix(float mat[N * N])
     {
-        for(int i = 0; i < N; i++)
-            for(int j = 0; j < N; j++)
+        for (int i = 0; i < N; i++)
+            for (int j = 0; j < N; j++)
                 m[i][j] = mat[i * N + j];
     }
 
@@ -59,7 +59,7 @@ public:
     __host__ __device__ SquareMatrix(float v, Args... args)
     {
         static_assert(1 + sizeof...(Args) == N * N,
-                      "SquareMatrix constructor takes N*N arguments");
+            "SquareMatrix constructor takes N*N arguments");
         init<N>(m, 0, 0, v, args...);
     }
 
@@ -76,13 +76,13 @@ public:
     __host__ __device__ static SquareMatrix Diag(float v, Args... args)
     {
         static_assert(1 + sizeof...(Args) == N,
-                      "SquareMatrix::Diag takes N arguments");
+            "SquareMatrix::Diag takes N arguments");
         SquareMatrix res;
         initDiag<N>(res.m, 0, v, args...);
         return res;
     }
 
-    __host__ __device__ const float* operator[](int i) const 
+    __host__ __device__ const float* operator[](int i) const
     {
         return m[i];
     }
@@ -94,9 +94,9 @@ public:
 
     __host__ __device__ bool operator==(const SquareMatrix& other) const
     {
-        for(int i = 0; i < N; i++)
-            for(int j = 0; j < N; j++)
-                if(m[i][j] != other.m[i][j])
+        for (int i = 0; i < N; i++)
+            for (int j = 0; j < N; j++)
+                if (m[i][j] != other.m[i][j])
                     return false;
         return true;
     }
@@ -215,7 +215,7 @@ __host__ __device__ inline float Determinant(const SquareMatrix<4>& m)
 __host__ __device__ inline SquareMatrix<2> Inverse(const SquareMatrix<2>& m)
 {
     float det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
-    if(det == 0)
+    if (det == 0)
         return SquareMatrix<2>::Zero();
 
     float invDet = 1.0f / det;
@@ -226,7 +226,6 @@ __host__ __device__ inline SquareMatrix<2> Inverse(const SquareMatrix<2>& m)
     inv[1][1] = m[0][0] * invDet;
 
     return inv;
-    
 }
 
 __host__ __device__ inline SquareMatrix<3> Inverse(const SquareMatrix<3>& m)
@@ -236,9 +235,9 @@ __host__ __device__ inline SquareMatrix<3> Inverse(const SquareMatrix<3>& m)
     float adj02 = m[1][0] * m[2][1] - m[1][1] * m[2][0];
 
     float det = m[0][0] * adj00 + m[0][1] * adj01 + m[0][2] * adj02;
-    if(det == 0)
+    if (det == 0)
         return SquareMatrix<3>::Zero();
-    
+
     float invDet = 1.0f / det;
     SquareMatrix<3> inv;
     inv[0][0] = adj00 * invDet;
@@ -273,9 +272,9 @@ __host__ __device__ inline SquareMatrix<4> Inverse(const SquareMatrix<4>& m)
     float c5 = m[2][2] * m[3][3] - m[3][2] * m[2][3];
 
     float det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
-    if(det == 0)
+    if (det == 0)
         return SquareMatrix<4>::Zero();
-    
+
     float invDet = 1.0f / det;
     float inv[4][4] = {
         {   ( m[1][1] * c5 - m[1][2] * c4 + m[1][3] * c3) * invDet,
@@ -293,7 +292,7 @@ __host__ __device__ inline SquareMatrix<4> Inverse(const SquareMatrix<4>& m)
         {   (-m[1][0] * c3 + m[1][1] * c1 - m[1][2] * c0) * invDet,
             ( m[0][0] * c3 - m[0][1] * c1 + m[0][2] * c0) * invDet,
             (-m[3][0] * s3 + m[3][1] * s1 - m[3][2] * s0) * invDet,
-            ( m[2][0] * s3 - m[2][1] * s1 + m[2][2] * s0) * invDet}
+            ( m[2][0] * s3 - m[2][1] * s1 + m[2][2] * s0) * invDet }
     };
 
     return SquareMatrix<4>(inv);

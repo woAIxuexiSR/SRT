@@ -5,14 +5,17 @@
         "resolution": [
             1920,
             1080
-        ]
+        ],
+        "frame": 60
     },
     "passes": [
         {
+            // "name": "Simple",
             "name": "PathTracer",
             "enable": true,
             "params": {
                 "samples_per_pixel": 1,
+                "type": "Ambient",
                 "max_depth": 16,
                 "rr_depth": 4,
                 "use_nee": true,
@@ -32,11 +35,13 @@
         "model": {
             "type": "obj",
             "path": "cornell_box_obj/cornell_box.obj"
+            // "path": "anime-cube/AnimatedCube.gltf"
         },
         "camera": {
             "type": "perspective",
             "position": [0, 1, 5.5],
             "target": [0, 1, 0.5],
+            // "target": [0, 0, 0],
             "up": [0, 1, 0],
             "fov": 60
         },
