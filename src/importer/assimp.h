@@ -15,7 +15,7 @@ private:
 public:
     void import(const string& filename, shared_ptr<Scene> _scene);
     void load_meshes();
-    // void load_bones(aiMesh* amesh, shared_ptr<Mesh> mesh);
-    void traverse(aiNode* anode, shared_ptr<SceneGraphNode> node);
+    void load_bones(aiMesh* amesh, shared_ptr<TriangleMesh> mesh);
+    void traverse(aiNode* anode, shared_ptr<SceneGraphNode> node, const Transform& parent_transform);
     void load_animations();
 };

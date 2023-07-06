@@ -4,7 +4,7 @@
 
 class Onb
 {
-private:
+public:
     float3 z, x, y;
 
 public:
@@ -24,6 +24,9 @@ public:
         x = normalize(_t - z * dot(_t, z));
         y = cross(z, x);
     }
+
+    // build from orthonormal basis N, T, B
+    __host__ __device__ Onb(float3 _n, float3 _t, float3 _b) : z(_n), x(_t), y(_b) {}
 
     __host__ __device__ float3 to_world(float3 p) const
     {

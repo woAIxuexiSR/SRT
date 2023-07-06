@@ -43,7 +43,7 @@ Disney parameters:
             roughness
             specular
             specularTint
-            anisotropic     (unused)
+            anisotropic
             sheen
             sheenTint
             clearcoat
@@ -127,7 +127,13 @@ public:
             {
                 float _FM = fresnel_mix(metallic, eta, L_H);
                 float3 F = lerp(spec_color, make_float3(1.0f), _FM);
-                float D = GTR2(H.z, roughness);
+
+                float aspect = sqrt(1.0f - anisotropic * 0.9f);
+                float a2 = roughness * roughness;
+                float ax = max(0.001f, a2 / aspect), ay = max(0.001f, a2 * aspect);
+
+                // float D = GTR2(H.z, roughness);
+                float D = GTR2_aniso(H.z, H.x, H.y, ax, ay);
                 float G = smithG_GGX(abs(L.z), roughness) * smithG_GGX(abs(V.z), roughness);
 
                 f_spec_reflect = F * D * G / (4.0f * L.z * V.z);
@@ -202,6 +208,10 @@ public:
             float3 spec_color = lerp(specular * 0.08f * lerp(make_float3(1.0f), ctint, specularTint), color, metallic);
             float3 sheen_color = lerp(make_float3(1.0f), ctint, sheenTint);
 
+            float aspect = sqrt(1.0f - anisotropic * 0.9f);
+            float a2 = roughness * roughness;
+            float ax = max(0.001f, a2 / aspect), ay = max(0.001f, a2 * aspect);
+
             float FM = fresnel_mix(metallic, eta, V.z);
             float diffuse_w = lum * (1.0f - metallic) * (1.0f - specTrans);
             float spec_reflect_w = Luminance(lerp(spec_color, make_float3(1.0f), FM));
@@ -223,7 +233,8 @@ public:
             else if (rnd.x < diffuse_w + spec_reflect_w)
             {
                 rnd.x = (rnd.x - diffuse_w) / spec_reflect_w;
-                float3 H = sample_GTR2(roughness, rnd);
+                // float3 H = sample_GTR2(roughness, rnd);
+                float3 H = sample_GTR2_aniso(ax, ay, rnd);
                 if (dot(V, H) <= 0.0f)
                     return BxDFSample();
                 L = normalize(reflect(-V, H));
@@ -231,7 +242,8 @@ public:
             else if (rnd.x < diffuse_w + spec_reflect_w + spec_refract_w)
             {
                 rnd.x = (rnd.x - diffuse_w - spec_reflect_w) / spec_refract_w;
-                float3 H = sample_GTR2(roughness, rnd);
+                // float3 H = sample_GTR2(roughness, rnd);
+                float3 H = sample_GGXVNDF(V, roughness, rnd);
                 L = refract(-V, H, eta);
                 if (dot(V, H) <= 0.0f || dot(L, L) == 0.0f)
                     return BxDFSample();
@@ -245,6 +257,7 @@ public:
                     return BxDFSample();
                 L = normalize(reflect(-V, H));
             }
+            // return { eval(L, wo, color, inner), L.z, L, sample_pdf(L, wo, color, inner) };
 
             float pdf = 0.0f;
 
@@ -256,18 +269,20 @@ public:
             if (diffuse_w > 0.0f && L.z > 0.0f)
                 pdf += diffuse_w * cosine_hemisphere_pdf(L.z);
             if (spec_reflect_w > 0.0f && dot(V, H_reflect) > 0.0f)
-                pdf += spec_reflect_w * GTR2(H_reflect.z, roughness) * H_reflect.z / (4.0f * dot(V, H_reflect));
+                // pdf += spec_reflect_w * GTR2(H_reflect.z, roughness) * H_reflect.z / (4.0f * dot(V, H_reflect));
+                pdf += spec_reflect_w * GTR2_aniso(H_reflect.z, H_reflect.x, H_reflect.y, ax, ay) * H_reflect.z / (4.0f * dot(V, H_reflect));
             if (spec_refract_w > 0.0f && dot(V, H_refract) > 0.0f && dot(L, H_refract) < 0.0f)
             {
                 float V_H = dot(V, H_refract), L_H = dot(L, H_refract);
                 float denom = (L_H + V_H * eta);
-                pdf += spec_refract_w * GTR2(H_refract.z, roughness) * H_refract.z * abs(L_H) / (denom * denom);
+                // pdf += spec_refract_w * GTR2(H_refract.z, roughness) * H_refract.z * abs(L_H) / (denom * denom);
+                pdf += spec_refract_w * GTR2(H_refract.z, roughness) * smithG_GGX(V.z, roughness) * max(dot(V, H_refract), 0.0f)
+                    / V.z * abs(L_H) / (denom * denom);
             }
             if (clearcoat_w > 0.0f && dot(V, H_reflect) > 0.0f)
                 pdf += clearcoat_w * GTR1(H_reflect.z, clearcoatGloss) * H_reflect.z / (4.0f * dot(V, H_reflect));
 
             return { eval(L, wo, color, inner), L.z, L, pdf };
-            // return { eval(L, wo, color, inner), L.z, L, sample_pdf(L, wo, color, inner) };
         }
 
         default:
@@ -301,6 +316,10 @@ public:
             float3 spec_color = lerp(specular * 0.08f * lerp(make_float3(1.0f), ctint, specularTint), color, metallic);
             float3 sheen_color = lerp(make_float3(1.0f), ctint, sheenTint);
 
+            float aspect = sqrt(1.0f - anisotropic * 0.9f);
+            float a2 = roughness * roughness;
+            float ax = max(0.001f, a2 / aspect), ay = max(0.001f, a2 * aspect);
+
             float FM = fresnel_mix(metallic, eta, V.z);
             float diffuse_w = lum * (1.0f - metallic) * (1.0f - specTrans);
             float spec_reflect_w = Luminance(lerp(spec_color, make_float3(1.0f), FM));
@@ -317,12 +336,15 @@ public:
             if (diffuse_w > 0.0f && L.z > 0.0f)
                 pdf += diffuse_w * cosine_hemisphere_pdf(L.z);
             if (spec_reflect_w > 0.0f && dot(V, H_reflect) > 0.0f)
-                pdf += spec_reflect_w * GTR2(H_reflect.z, roughness) * H_reflect.z / (4.0f * dot(V, H_reflect));
+                // pdf += spec_reflect_w * GTR2(H_reflect.z, roughness) * H_reflect.z / (4.0f * dot(V, H_reflect));
+                pdf += spec_reflect_w * GTR2_aniso(H_reflect.z, H_reflect.x, H_reflect.y, ax, ay) * H_reflect.z / (4.0f * dot(V, H_reflect));
             if (spec_refract_w > 0.0f && dot(V, H_refract) > 0.0f && dot(L, H_refract) < 0.0f)
             {
                 float V_H = dot(V, H_refract), L_H = dot(L, H_refract);
                 float denom = (L_H + V_H * eta);
-                pdf += spec_refract_w * GTR2(H_refract.z, roughness) * H_refract.z * abs(L_H) / (denom * denom);
+                // pdf += spec_refract_w * GTR2(H_refract.z, roughness) * H_refract.z * abs(L_H) / (denom * denom);
+                pdf += spec_refract_w * GTR2(H_refract.z, roughness) * smithG_GGX(V.z, roughness) * max(dot(V, H_refract), 0.0f)
+                    / V.z * abs(L_H) / (denom * denom);
             }
             if (clearcoat_w > 0.0f && dot(V, H_reflect) > 0.0f)
                 pdf += clearcoat_w * GTR1(H_reflect.z, clearcoatGloss) * H_reflect.z / (4.0f * dot(V, H_reflect));

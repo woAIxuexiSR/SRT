@@ -1,20 +1,20 @@
 #include "mesh.h"
 
-TriangleMesh::TriangleMesh(const vector<float3>& _v, const vector<uint3>& _i,
-    const vector<float3>& _n, const vector<float3>& _t, const vector<float2>& _tc)
-    : vertices(_v), indices(_i), normals(_n), tangents(_t), texcoords(_tc)
-{
-    bone_ids.resize(vertices.size() * MAX_BONE_PER_VERTEX, -1);
-    bone_weights.resize(vertices.size() * MAX_BONE_PER_VERTEX, 0.0f);
-    compute_aabb();
-}
-
 void TriangleMesh::compute_aabb()
 {
     assert(!vertices.empty());
     aabb = AABB();
     for (auto v : vertices)
         aabb.expand(v);
+}
+
+#ifndef SRT_HIGH_PERFORMANCE
+
+void TriangleMesh::reset_bones()
+{
+    has_bone = true;
+    bone_ids.resize(vertices.size() * MAX_BONE_PER_VERTEX, -1);
+    bone_weights.resize(vertices.size() * MAX_BONE_PER_VERTEX, 0);
 }
 
 void TriangleMesh::add_bone_influence(int vid, int bid, float weight)
@@ -32,3 +32,5 @@ void TriangleMesh::add_bone_influence(int vid, int bid, float weight)
     }
     cout << "ERROR::Too many bone influences for vertex " << vid << endl;
 }
+
+#endif

@@ -128,7 +128,7 @@ GUI::GUI(int _w, int _h, shared_ptr<Camera> _c, int n)
     glfwSetWindowUserPointer(window, &user_data);
     auto framebuffer_size_callback = [](GLFWwindow* window, int w, int h) {
         glViewport(0, 0, w, h);
-    };
+        };
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     auto cursor_pos_callback = [](GLFWwindow* window, double x, double y) {
@@ -142,20 +142,20 @@ GUI::GUI(int _w, int _h, shared_ptr<Camera> _c, int n)
                 ud->first_mouse = false;
             }
             float cursor_speed = 0.04f;
-            float xoffset = (ud->last_x - static_cast<float>(x)) * cursor_speed;
+            float xoffset = (static_cast<float>(x) - ud->last_x) * cursor_speed;
             float yoffset = (static_cast<float>(y) - ud->last_y) * cursor_speed;
             ud->last_x = static_cast<float>(x);
             ud->last_y = static_cast<float>(y);
-            // ud->camera->process_mouse_input(xoffset, yoffset);
+            ud->camera->process_mouse_input(xoffset, yoffset);
         }
         else ud->first_mouse = true;
-    };
+        };
     glfwSetCursorPosCallback(window, cursor_pos_callback);
 
     auto scroll_callback = [](GLFWwindow* window, double x, double y) {
         WindowUserData* ud = (WindowUserData*)glfwGetWindowUserPointer(window);
         ud->camera->process_scroll_input(static_cast<float>(y));
-    };
+        };
     glfwSetScrollCallback(window, scroll_callback);
 
     glfwSwapInterval(0);
@@ -180,8 +180,11 @@ GUI::GUI(int _w, int _h, shared_ptr<Camera> _c, int n)
     cuda_texs.resize(num_textures);
     for (int i = 0; i < num_textures; i++)
     {
-        float tl = i / num_textures, tr = (i + 1) / num_textures;
-        float vl = tl * 2.0f - 1.0f, vr = tr * 2.0f - 1.0f;
+        // flip the texture horizontally
+        float tl = (num_textures - i - 1) / num_textures;
+        float tr = (num_textures - i - 2) / num_textures;
+        float vl = (i / num_textures) * 2.0f - 1.0f;
+        float vr = ((i + 1) / num_textures) * 2.0f - 1.0f;
         float quad_vertices[] =
         {
             vl,  1.0f, tl, 1.0f,
@@ -233,19 +236,19 @@ void GUI::process_input()
 
     WindowUserData* ud = (WindowUserData*)glfwGetWindowUserPointer(window);
     float deltaTime = static_cast<float>(glfwGetTime()) - ud->last_time;
-    // if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-    //     ud->camera->process_keyboard_input(CameraMovement::UP, deltaTime);
-    // if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-    //     ud->camera->process_keyboard_input(CameraMovement::DOWN, deltaTime);
-    // if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-    //     ud->camera->process_keyboard_input(CameraMovement::LEFT, deltaTime);
-    // if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-    //     ud->camera->process_keyboard_input(CameraMovement::RIGHT, deltaTime);
-    // if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-    //     ud->camera->process_keyboard_input(CameraMovement::FORWARD, deltaTime);
-    // if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-    //     ud->camera->process_keyboard_input(CameraMovement::BACKWARD, deltaTime);
-    // ud->last_time = static_cast<float>(glfwGetTime());
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        ud->camera->process_keyboard_input(CameraMovement::UP, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        ud->camera->process_keyboard_input(CameraMovement::DOWN, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        ud->camera->process_keyboard_input(CameraMovement::LEFT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        ud->camera->process_keyboard_input(CameraMovement::RIGHT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+        ud->camera->process_keyboard_input(CameraMovement::FORWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+        ud->camera->process_keyboard_input(CameraMovement::BACKWARD, deltaTime);
+    ud->last_time = static_cast<float>(glfwGetTime());
 }
 
 void GUI::begin_frame()
@@ -276,7 +279,7 @@ void GUI::end_frame()
 
     ImGui::Render();
 
-    user_data.camera->moved = false;
+    user_data.camera->set_moved(false);
     process_input();
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);

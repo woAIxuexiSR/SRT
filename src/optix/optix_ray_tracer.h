@@ -21,11 +21,17 @@ protected:
     vector<OptixPipeline> pipelines;
 
     // traversable
-    vector<OptixTraversableHandle> gas_traversable;
-    vector<OptixInstance> ias_instances;
-    OptixTraversableHandle ias_traversable;
+    vector<CUdeviceptr> d_vertices;
+    vector<uint32_t> gas_input_flags;
+    vector<OptixBuildInput> gas_inputs;
     vector<GPUMemory<unsigned char> > gas_buffer;
+    vector<OptixTraversableHandle> gas_traversable;
+
+    vector<OptixInstance> ias_instances;
+    GPUMemory<OptixInstance> ias_instances_buffer;
+    OptixBuildInput ias_input;
     GPUMemory<unsigned char> ias_buffer;
+    OptixTraversableHandle ias_traversable;
 
     // sbt
     vector<OptixShaderBindingTable> sbts;
@@ -38,7 +44,7 @@ private:
     void create_context();
     void create_module(const string& ptx);
     void create_pipeline(const vector<string>& ptxs);
-    OptixTraversableHandle build_as_from_input(const vector<OptixBuildInput>& inputs, GPUMemory<unsigned char>& as_buffer, bool update);
+    OptixTraversableHandle build_as_from_input(const vector<OptixBuildInput>& inputs, GPUMemory<unsigned char>& as_buffer, bool compact, bool update);
     void build_gas();
     void build_ias();
     void build_sbt();

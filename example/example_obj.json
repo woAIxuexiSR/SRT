@@ -1,7 +1,7 @@
 {
     "render": {
         "type": "interactive",
-        "output": "output.png",
+        "output": "output2.png",
         "resolution": [
             1920,
             1080
@@ -10,8 +10,8 @@
     },
     "passes": [
         {
-            // "name": "Simple",
-            "name": "PathTracer",
+            "name": "Simple",
+            // "name": "PathTracer",
             "enable": true,
             "params": {
                 "samples_per_pixel": 1,
@@ -29,25 +29,36 @@
                 "type": "ACES",
                 "use_gamma": true
             }
+        },
+        {
+            "enable": false,
+            "name": "Accumulate",
+            "params": {
+            }
         }
     ],
     "scene": {
         "model": {
-            "type": "obj",
-            "path": "cornell_box_obj/cornell_box.obj"
+            "type": "gltf",
+            // "path": "cornell_box_obj/cornell_box.obj"
             // "path": "anime-cube/AnimatedCube.gltf"
+            // "path": "kuma_heavy_robot/scene.gltf"
+            // "path": "obot_cute_robot/scene.gltf"
+            "path": "broken_steampunk_clock/scene.gltf"
+            // "path": "free_cyberpunk_hovercar/scene.gltf"
         },
         "camera": {
             "type": "perspective",
-            "position": [0, 1, 5.5],
-            "target": [0, 1, 0.5],
-            // "target": [0, 0, 0],
+            "position": [0, 10, 55],
+            // "position": [0, 1, 5.5],
+            // "target": [0, 1, 0.5],
+            "target": [0, 0, 0],
             "up": [0, 1, 0],
             "fov": 60
         },
         "environment": {
             "type": "constant",
-            "color": [0, 0, 0]
+            "color": [1, 1, 1]
         }
     }
 }

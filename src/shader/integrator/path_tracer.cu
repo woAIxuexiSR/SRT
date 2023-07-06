@@ -22,39 +22,37 @@ extern "C" __global__ void __closesthit__radiance()
     const float2 uv = optixGetTriangleBarycentrics();
     const float3 ray_dir = optixGetWorldRayDirection();
 
-    const Transform* transform = sbtData.instance->transform;
-    const GTriangleMesh* mesh = sbtData.instance->mesh;
+    const GTriangleMesh* mesh = sbtData.mesh;
+    const Transform* transform = sbtData.transform;
 
     const uint3& index = mesh->indices[prim_idx];
     const float3& v0 = mesh->vertices[index.x];
     const float3& v1 = mesh->vertices[index.y];
     const float3& v2 = mesh->vertices[index.z];
 
+    float3 pos = v0 * (1.0f - uv.x - uv.y) + v1 * uv.x + v2 * uv.y;
+    float3 normal;
+    if (mesh->normals)
+        normal = normalize(mesh->normals[index.x] * (1.0f - uv.x - uv.y) + mesh->normals[index.y] * uv.x + mesh->normals[index.z] * uv.y);
+    else
+        normal = normalize(cross(v1 - v0, v2 - v0));
+    float2 texcoord = uv;
+    if (mesh->texcoords)
+        texcoord = mesh->texcoords[index.x] * (1.0f - uv.x - uv.y) + mesh->texcoords[index.y] * uv.x + mesh->texcoords[index.z] * uv.y;
+
+    float3 shading_normal = mesh->material->shading_normal(normal, texcoord);
+    float3 tangent = (abs(shading_normal.x) > abs(shading_normal.y)) ? make_float3(0.0f, 1.0f, 0.0f) : make_float3(1.0f, 0.0f, 0.0f);
+    if (mesh->tangents)
+        tangent = normalize(mesh->tangents[index.x] * (1.0f - uv.x - uv.y) + mesh->tangents[index.y] * uv.x + mesh->tangents[index.z] * uv.y);
+
     HitInfo& prd = *(HitInfo*)getPRD<HitInfo>();
     prd.hit = true;
-    prd.pos = transform->apply_point(v0 * (1.0f - uv.x - uv.y) + v1 * uv.x + v2 * uv.y);
-
-    prd.normal = transform->apply_vector(normalize(cross(v1 - v0, v2 - v0)));
-    prd.inner = false;
-    if (dot(prd.normal, ray_dir) > 0.0f)
-    {
-        prd.normal = -prd.normal;
-    }
-
-    prd.texcoord = uv;
-    if (mesh->texcoords)
-        prd.texcoord = mesh->texcoords[index.x] * (1.0f - uv.x - uv.y) + mesh->texcoords[index.y] * uv.x + mesh->texcoords[index.z] * uv.y;
-    float3 shading_normal = mesh->material->shading_normal(prd.normal, prd.texcoord);
-    // shading_normal = transform->apply_vector(shading_normal);
-
-    float3 tangent = shading_normal.x > 0.1f ? make_float3(0.0f, 1.0f, 0.0f) : make_float3(1.0f, 0.0f, 0.0f);
-    if (mesh->tangents)
-        tangent = transform->apply_vector(mesh->tangents[index.x] * (1.0f - uv.x - uv.y) + mesh->tangents[index.y] * uv.x + mesh->tangents[index.z] * uv.y);
-    prd.onb = Onb(shading_normal, tangent);
-
-    prd.color = mesh->material->surface_color(prd.texcoord);
+    prd.pos = transform->apply_point(pos);
+    prd.normal = transform->apply_vector(normal);
+    prd.texcoord = texcoord;
+    prd.onb = Onb(transform->apply_vector(shading_normal), transform->apply_vector(tangent));
+    prd.color = mesh->material->surface_color(texcoord);
     prd.mat = mesh->material;
-
     prd.light_id = sbtData.light_id;
 }
 
@@ -117,7 +115,8 @@ extern "C" __global__ void __raygen__()
             // hit light
             if (info.hit && info.mat->is_emissive())
             {
-                if (info.inner) break;
+                if (dot(info.normal, ray.dir) > 0.0f)
+                    break;
 
                 float mis_weight = 1.0f;
                 if (params.use_nee && !specular)

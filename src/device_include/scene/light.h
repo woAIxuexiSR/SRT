@@ -7,24 +7,23 @@ class LightSample
 {
 public:
     float3 pos;
-    float3 normal;
-    float3 shading_normal;
-    float3 emission;
-    float pdf;
+    float3 normal;      // not support shading normal
+    float3 emission{ 0.0f, 0.0f, 0.0f };
+    float pdf{ 0.0f };
 };
 
 class AreaLight
 {
 public:
-    int face_num { 0 };
-    GInstance* instance{ nullptr };
+    GTriangleMesh* mesh{ nullptr };
+    Transform* transform{ nullptr };
+
+    int face_num{ 0 };
     float* areas{ nullptr };
     float area_sum{ 0 };
 
 public:
     AreaLight() {}
-    AreaLight(int _n, GInstance* _m, float* _a, float _s)
-        : face_num(_n), instance(_m), areas(_a), area_sum(_s) {}
 
     __device__ LightSample sample(float2 rnd)
     {
@@ -37,26 +36,26 @@ public:
                 rnd.x = clamp((s - sum) / areas[i], 0.0f, 1.0f);
                 float2 p = uniform_sample_triangle(rnd);
 
-                GTriangleMesh* mesh = instance->mesh;
                 uint3& index = mesh->indices[i];
+                const float3& v0 = mesh->vertices[index.x];
+                const float3& v1 = mesh->vertices[index.y];
+                const float3& v2 = mesh->vertices[index.z];
 
-                float3 pos = mesh->vertices[index.x] * (1.0f - p.x - p.y) + mesh->vertices[index.y] * p.x + mesh->vertices[index.z] * p.y;
+                float3 pos = v0 * (1.0f - p.x - p.y) + v1 * p.x + v2 * p.y;
+
+                float2 texcoord = p;
+                if (mesh->texcoords)
+                    texcoord = mesh->texcoords[index.x] * (1.0f - p.x - p.y) + mesh->texcoords[index.y] * p.x + mesh->texcoords[index.z] * p.y;
 
                 float3 normal;
                 if (mesh->normals)
                     normal = mesh->normals[index.x] * (1.0f - p.x - p.y) + mesh->normals[index.y] * p.x + mesh->normals[index.z] * p.y;
                 else
-                    normal = cross(mesh->vertices[index.y] - mesh->vertices[index.x], mesh->vertices[index.z] - mesh->vertices[index.x]);
+                    normal = cross(v1 - v0, v2 - v0);
 
-                float2 texcoord;
-                if (mesh->texcoords)
-                    texcoord = mesh->texcoords[index.x] * (1.0f - p.x - p.y) + mesh->texcoords[index.y] * p.x + mesh->texcoords[index.z] * p.y;
-
-                float3 shading_normal = mesh->material->shading_normal(normal, texcoord);
                 float3 emission = mesh->material->emission(texcoord);
 
-                Transform* t = instance->transform;
-                return { t->apply_point(pos), t->apply_vector(normal), t->apply_vector(shading_normal), emission, sample_pdf() };
+                return { transform->apply_point(pos), transform->apply_vector(normal), emission, sample_pdf() };
             }
             sum += areas[i];
         }
@@ -82,8 +81,6 @@ public:
 
 public:
     EnvironmentLight() {}
-    EnvironmentLight(Type _t, float3 _c, cudaTextureObject_t _tex = 0)
-        : type(_t), emission_color(_c), texture(_tex) {}
 
     __device__ float3 emission(float3 dir)
     {
@@ -116,8 +113,7 @@ public:
     EnvironmentLight* env_light{ nullptr };
 
 public:
-    Light(int _n, AreaLight* _l, float _s, EnvironmentLight* _e = nullptr)
-        : num(_n), lights(_l), weight_sum(_s), env_light(_e) {}
+    Light() {}
 
     __device__ LightSample sample(float2 rnd)
     {
@@ -125,7 +121,7 @@ public:
         float sum = 0.0f;
         for (int i = 0; i < num; i++)
         {
-            float wi = lights[i].area_sum * lights[i].instance->mesh->material->intensity;
+            float wi = lights[i].area_sum * lights[i].mesh->material->intensity;
             if (s <= sum + wi || i == num - 1)
             {
                 rnd.x = clamp((s - sum) / wi, 0.0f, 1.0f);
@@ -141,7 +137,7 @@ public:
     // sample proportional to area * intensity
     __device__ float sample_pdf(int idx)
     {
-        return lights[idx].instance->mesh->material->intensity / weight_sum;
+        return lights[idx].mesh->material->intensity / weight_sum;
     }
 
     __device__ float3 environment_emission(float3 dir)

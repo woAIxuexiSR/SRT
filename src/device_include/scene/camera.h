@@ -44,10 +44,11 @@ public:
     CameraController(const Transform& t, float _r, Type _t = Type::Orbit)
         : type(_t), radius(_r)
     {
+        // camera to world transform
         pos = make_float3(t[0][3], t[1][3], t[2][3]);
-        x = make_float3(t[0][0], t[1][0], t[2][0]);
-        y = make_float3(t[0][1], t[1][1], t[2][1]);
-        z = make_float3(t[0][2], t[1][2], t[2][2]);
+        x = normalize(make_float3(t[0][0], t[1][0], t[2][0]));
+        y = normalize(make_float3(t[0][1], t[1][1], t[2][1]));
+        z = normalize(make_float3(t[0][2], t[1][2], t[2][2]));
         target = pos + z * radius;
 
         phi = Degrees(atan2(z.z, z.x)); // phi is in [-180, 180], angle between projected z and (1, 0, 0)
@@ -61,7 +62,7 @@ public:
         float cos_theta = cos(Radians(theta)), sin_theta = sin(Radians(theta));
         float cos_phi = cos(Radians(phi)), sin_phi = sin(Radians(phi));
         z = make_float3(sin_theta * cos_phi, cos_theta, sin_theta * sin_phi);
-        x = make_float3(sin_phi, 0.0f, -cos_phi);   // cross((0, 1, 0), z)
+        x = make_float3(sin_phi, 0.0f, -cos_phi);                               // cross((0, 1, 0), z)
         y = make_float3(-cos_theta * cos_phi, sin_theta, -cos_theta * sin_phi); // cross(z, x)
 
         if (type == Type::Orbit)
@@ -117,6 +118,7 @@ public:
             Ray ray(make_float3(0.0f), normalize(make_float3(p, 1.0f)));
             return controller.to_world(ray);
         }
+#ifndef SRT_HIGH_PERFORMANCE
         case Type::Orthographic:            // approximate size
         {
             Ray ray(make_float3(p * controller.radius, 1.0f), make_float3(0.0f, 0.0f, 1.0f));
@@ -136,6 +138,7 @@ public:
             float3 dir = make_float3(-math_space_dir.x, math_space_dir.z, math_space_dir.y);
             return controller.to_world(Ray(make_float3(0.0f), dir));
         }
+#endif
         default:
             return Ray();
         }
@@ -169,5 +172,17 @@ public:
     {
         fov = clamp(fov - yoffset, 1.0f, 90.0f);
         reset();
+    }
+
+    void process_keyboard_input(CameraMovement movement, float m)
+    {
+        controller.process_keyboard_input(movement, m);
+        moved = true;
+    }
+
+    void process_mouse_input(float xoffset, float yoffset)
+    {
+        controller.process_mouse_input(xoffset, yoffset);
+        moved = true;
     }
 };

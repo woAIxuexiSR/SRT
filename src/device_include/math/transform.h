@@ -6,6 +6,7 @@
 #include "aabb.h"
 #include "basic.h"
 #include "matrix.h"
+#include "onb.h"
 #include "quaternion.h"
 #include "ray.h"
 
@@ -62,6 +63,11 @@ public:
         res.pmin = make_float3(min(pmin.x, pmax.x), min(pmin.y, pmax.y), min(pmin.z, pmax.z));
         res.pmax = make_float3(max(pmin.x, pmax.x), max(pmin.y, pmax.y), max(pmin.z, pmax.z));
         return res;
+    }
+
+    __host__ __device__ Onb apply_onb(const Onb& onb) const
+    {
+        return Onb(apply_vector(onb.z), apply_vector(onb.x), apply_vector(onb.y));
     }
 
     /* static methods */

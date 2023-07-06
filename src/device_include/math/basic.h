@@ -206,10 +206,34 @@ __host__ __device__ inline float3 sample_GTR2(float a, float2 sample)
     return make_float3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
 }
 
-// __host__ __device__ inline float3 sample_GTR2_aniso(float ax, float ay, float2 sample)
-// {
+__host__ __device__ inline float3 sample_GTR2_aniso(float ax, float ay, float2 sample)
+{
+    float phi = 2.0f * (float)M_PI * sample.x;
+    float sin_phi = ay * sin(phi);
+    float cos_phi = ax * cos(phi);
+    float tan_theta = sqrt(sample.y / (1.0f - sample.y));
+    return normalize(make_float3(tan_theta * cos_phi, tan_theta * sin_phi, 1.0f));
+}
 
-// }
+__host__ __device__ inline float3 sample_GGXVNDF(float3 V, float a, float2 sample)
+{
+    float3 Vh = normalize(make_float3(a * V.x, a * V.y, V.z));
+
+    float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
+    float3 T1 = (lensq > 0.0f) ? make_float3(-Vh.y, Vh.x, 0.0f) * rsqrtf(lensq) : make_float3(1.0f, 0.0f, 0.0f);
+    float3 T2 = cross(Vh, T1);
+
+    float r = sqrt(sample.x);
+    float phi = 2.0f * (float)M_PI * sample.y;
+    float t1 = r * cos(phi);
+    float t2 = r * sin(phi);
+    float s = 0.5f * (1.0f + Vh.z);
+    t2 = (1.0f - s) * sqrt(1.0f - t1 * t1) + s * t2;
+
+    float3 Nh = t1 * T1 + t2 * T2 + sqrt(max(0.0f, 1.0f - t1 * t1 - t2 * t2)) * Vh;
+
+    return normalize(make_float3(a * Nh.x, a * Nh.y, max(0.0f, Nh.z)));
+}
 
 __host__ __device__ inline float3 refract(float3 i, float3 n, float eta)
 {

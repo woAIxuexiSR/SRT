@@ -103,7 +103,7 @@ public:
     // the quaternion must be normalized, t in [0, 1]
     __host__ __device__ static Quaternion Slerp(const Quaternion& q1, const Quaternion& q2, float t)
     {
-        float cos_theta = dot(q1.q, q2.q);
+        float cos_theta = clamp(dot(q1.q, q2.q), 0.0f, 1.0f);
         float theta = acos(cos_theta);
         float theta_prime = theta * t;
         Quaternion qperp = Normalize(q2 - q1 * cos_theta);

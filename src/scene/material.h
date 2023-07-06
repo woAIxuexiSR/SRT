@@ -16,10 +16,4 @@ public:
 
     int color_tex_id{ -1 };
     int normal_tex_id{ -1 };
-
-public:
-    Material() {}
-
-    void set_type(BxDF::Type type);
-    void set_property(const string& str, float value);
 };

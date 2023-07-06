@@ -29,6 +29,7 @@ public:
 
     Interpolation itype { Interpolation::Linear };
     Extrapolation etype { Extrapolation::Repeat };
+    string name;
     float duration { 0.0f };    // in seconds
     vector<KeyTranslation> translations;
     vector<KeyRotation> rotations;

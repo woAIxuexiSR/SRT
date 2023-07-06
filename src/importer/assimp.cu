@@ -3,7 +3,7 @@
 float3 ai_convert(const aiVector3D& v) { return make_float3(v.x, v.y, v.z); }
 float3 ai_convert(const aiColor3D& c) { return make_float3(c.r, c.g, c.b); }
 float2 ai_convert(const aiVector2D& v) { return make_float2(v.x, v.y); }
-Quaternion ai_convert(const aiQuaternion& q) { return Quaternion(q.w, q.x, q.y, q.z); }
+Quaternion ai_convert(const aiQuaternion& q) { return Quaternion(q.x, q.y, q.z, q.w); }
 string ai_convert(const aiString& s) { return string(s.C_Str()); }
 Transform ai_convert(const aiMatrix4x4& m)
 {
@@ -12,7 +12,8 @@ Transform ai_convert(const aiMatrix4x4& m)
     t[1][0] = m.a2; t[1][1] = m.b2; t[1][2] = m.c2; t[1][3] = m.d2;
     t[2][0] = m.a3; t[2][1] = m.b3; t[2][2] = m.c3; t[2][3] = m.d3;
     t[3][0] = m.a4; t[3][1] = m.b4; t[3][2] = m.c4; t[3][3] = m.d4;
-    return t;
+    // return t;
+    return Transform(Transpose(t.get_matrix()));
 }
 shared_ptr<Material> ai_convert(aiMaterial* amat)
 {
@@ -61,14 +62,14 @@ shared_ptr<Material> ai_convert(aiMaterial* amat)
     material->bxdf.ior = ior;
     material->bxdf.metallic = metallic;
     material->bxdf.subsurface = subsurface;
-    material->bxdf.roughness = roughness;
+    material->bxdf.roughness = max(roughness, 0.001f);
     material->bxdf.specular = specular;
     material->bxdf.specularTint = specularTint;
     material->bxdf.anisotropic = anisotropic;
     material->bxdf.sheen = sheen;
     material->bxdf.sheenTint = sheenTint;
     material->bxdf.clearcoat = clearcoat;
-    material->bxdf.clearcoatGloss = clearcoatGloss;
+    material->bxdf.clearcoatGloss = max(clearcoatGloss, 0.001f);
     material->bxdf.specTrans = specTrans;
 
     return material;
@@ -79,7 +80,7 @@ void AssimpImporter::import(const string & filename, shared_ptr<Scene> _scene)
 {
     Assimp::Importer importer;
     unsigned int flags = 0 | aiProcess_Triangulate
-        | aiProcess_GenSmoothNormals
+        | aiProcess_GenNormals
         | aiProcess_CalcTangentSpace
         | aiProcess_FlipUVs;
     ascene = importer.ReadFile(filename, flags);
@@ -96,7 +97,7 @@ void AssimpImporter::import(const string & filename, shared_ptr<Scene> _scene)
     load_meshes();
 
     scene->root = make_shared<SceneGraphNode>();
-    traverse(ascene->mRootNode, scene->root);
+    traverse(ascene->mRootNode, scene->root, Transform());
 
     load_animations();
 }
@@ -151,7 +152,10 @@ void AssimpImporter::load_meshes()
         mesh->tangents = tangents;
         mesh->texcoords = texcoords;
         mesh->name = ai_convert(amesh->mName);
-        // load_bones(amesh, mesh);
+        mesh->compute_aabb();
+
+        // load mesh's bone weights
+        load_bones(amesh, mesh);
 
         // load material
         aiMaterial* amat = ascene->mMaterials[amesh->mMaterialIndex];
@@ -176,77 +180,63 @@ void AssimpImporter::load_meshes()
     }
 }
 
-// void AssimpImporter::load_bones(aiMesh* amesh, shared_ptr<Mesh> mesh)
-// {
-//     if (!amesh->HasBones()) return;
+void AssimpImporter::load_bones(aiMesh* amesh, shared_ptr<TriangleMesh> mesh)
+{
+    if (!amesh->HasBones()) return;
 
-//     for (int i = 0; i < amesh->mNumBones; i++)
-//     {
-//         int bone_id = -1;
-//         string bone_name = ai_convert(amesh->mBones[i]->mName);
-//         if (bone_names.find(bone_name) == bone_names.end())
-//         {
-//             bone_id = scene->bones.size();
-//             bone_names[bone_name] = bone_id;
-//             scene->bones.push_back(Bone());
-//         }
-//         else
-//             bone_id = bone_names[bone_name];
+    mesh->reset_bones();
+    for (int i = 0; i < amesh->mNumBones; i++)
+    {
+        string bone_name = ai_convert(amesh->mBones[i]->mName);
+        int bone_id = scene->find_bone(bone_name);
+        if (bone_id == -1)
+        {
+            Bone bone;
+            bone.name = bone_name;
+            bone.offset = ai_convert(amesh->mBones[i]->mOffsetMatrix);
+            bone_id = scene->add_bone(bone);
+        }
 
-//         assert(bone_id != -1);
-//         scene->bones[bone_id].name = bone_name;
-//         scene->bones[bone_id].offset = ai_convert(amesh->mBones[i]->mOffsetMatrix);
+        auto& weights = amesh->mBones[i]->mWeights;
+        int num_weights = amesh->mBones[i]->mNumWeights;
+        for (int j = 0; j < num_weights; j++)
+        {
+            int vertex_id = weights[j].mVertexId;
+            float weight = weights[j].mWeight;
+            assert(vertex_id < mesh->vertices.size());
+            mesh->add_bone_influence(vertex_id, bone_id, weight);
+        }
+    }
+}
 
-//         auto& weights = amesh->mBones[i]->mWeights;
-//         int num_weights = amesh->mBones[i]->mNumWeights;
-//         for (int j = 0; j < num_weights; j++)
-//         {
-//             int vertex_id = weights[j].mVertexId;
-//             float weight = weights[j].mWeight;
-//             assert(vertex_id < mesh->vertices.size());
-//             for (int k = 0; k < MAX_BONE_PER_VERTEX; k++)
-//             {
-//                 if (mesh->bone_ids[vertex_id * MAX_BONE_PER_VERTEX + k] == -1)
-//                 {
-//                     mesh->bone_ids[vertex_id * MAX_BONE_PER_VERTEX + k] = bone_id;
-//                     mesh->bone_weights[vertex_id * MAX_BONE_PER_VERTEX + k] = weight;
-//                     break;
-//                 }
-//             }
-//         }
-//     }
-// }
-
-void AssimpImporter::traverse(aiNode* anode, shared_ptr<SceneGraphNode> node)
+void AssimpImporter::traverse(aiNode* anode, shared_ptr<SceneGraphNode> node, const Transform& parent_transform)
 {
     node->name = ai_convert(anode->mName);
     node->transform = ai_convert(anode->mTransformation);
     scene_graph_nodes[node->name] = node;
 
+    Transform global_transform = parent_transform * node->transform;
     for (int i = 0; i < anode->mNumMeshes; i++)
     {
         int mesh_id = anode->mMeshes[i];
         int instance_id = scene->instances.size();
         scene->instances.push_back(mesh_id);
-        scene->instance_transforms.push_back(node->transform);
+        scene->instance_transforms.push_back(global_transform);
         node->instance_ids.push_back(instance_id);
     }
 
-    // if node has no mesh, it is a bone
-    // if (anode->mNumMeshes == 0)
-    // {
-    //     auto it = bone_names.find(node->name);
-    //     int bone_id = -1;
-    //     if (it != bone_names.end())
-    //         bone_id = it->second;
-    //     node->bone_id = bone_id;
-    // }
+    if (anode->mNumMeshes == 0)
+    {
+        int bone_id = scene->find_bone(node->name);
+        if (bone_id != -1)
+            node->bone_id = bone_id;
+    }
 
     for (int i = 0; i < anode->mNumChildren; i++)
     {
         shared_ptr<SceneGraphNode> child = make_shared<SceneGraphNode>();
         node->children.push_back(child);
-        traverse(anode->mChildren[i], child);
+        traverse(anode->mChildren[i], child, global_transform);
     }
 }
 

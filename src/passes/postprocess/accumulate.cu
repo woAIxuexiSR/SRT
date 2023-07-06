@@ -10,11 +10,11 @@ void Accumulate::resize(int _w, int _h)
 
 void Accumulate::render(shared_ptr<Film> film)
 {
-    // if (!enable || !scene->is_static())
-    // {
-    //     frame_count = 0;
-    //     return;
-    // }
+    if (!enable || !scene->is_static())
+    {
+        frame_count = 0;
+        return;
+    }
     if(!enable)
     {
         frame_count = 0;

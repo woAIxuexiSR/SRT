@@ -43,6 +43,22 @@ int Scene::add_animation(shared_ptr<Animation> animation)
     return id;
 }
 
+int Scene::find_bone(const string& name)
+{
+    for (int i = 0; i < bones.size(); i++)
+        if (bones[i].name == name)
+            return i;
+    return -1;
+}
+
+int Scene::add_bone(const Bone& bone)
+{
+    int id = bones.size();
+    bones.push_back(bone);
+    bone_transforms.push_back(Transform());
+    return id;
+}
+
 /* GPU build functions */
 
 void Scene::build_gscene()
@@ -132,44 +148,50 @@ void Scene::build_gscene_meshes()
     gscene.tangent_buffer.resize(mesh_num);
     gscene.texcoord_buffer.resize(mesh_num);
 
-    gscene.animated_vertex_buffer.resize(mesh_num);
-    gscene.animated_normal_buffer.resize(mesh_num);
-    gscene.animated_tangent_buffer.resize(mesh_num);
+#ifndef SRT_HIGH_PERFORMANCE
+    gscene.original_vertex_buffer.resize(mesh_num);
+    gscene.original_normal_buffer.resize(mesh_num);
+    gscene.original_tangent_buffer.resize(mesh_num);
     gscene.bone_id_buffer.resize(mesh_num);
     gscene.bone_weight_buffer.resize(mesh_num);
+    if (!bones.empty())
+        gscene.bone_transform_buffer.resize_and_copy_from_host(bone_transforms);
+#endif
 
     for (int i = 0; i < mesh_num; i++)
     {
         auto mesh = meshes[i];
 
-        gscene.animated_vertex_buffer[i].resize_and_copy_from_host(mesh->vertices);
+        gscene.vertex_buffer[i].resize_and_copy_from_host(mesh->vertices);
         gscene.index_buffer[i].resize_and_copy_from_host(mesh->indices);
         if (!meshes[i]->normals.empty())
-            gscene.animated_normal_buffer[i].resize_and_copy_from_host(mesh->normals);
+            gscene.normal_buffer[i].resize_and_copy_from_host(mesh->normals);
         if (!meshes[i]->tangents.empty())
-            gscene.animated_tangent_buffer[i].resize_and_copy_from_host(mesh->tangents);
+            gscene.tangent_buffer[i].resize_and_copy_from_host(mesh->tangents);
         if (!meshes[i]->texcoords.empty())
             gscene.texcoord_buffer[i].resize_and_copy_from_host(mesh->texcoords);
 
+#ifndef SRT_HIGH_PERFORMANCE
         if (mesh->has_bone)
         {
-            gscene.vertex_buffer[i].resize_and_copy_from_host(mesh->vertices);
+            gscene.original_vertex_buffer[i].resize_and_copy_from_host(mesh->vertices);
             if (!meshes[i]->normals.empty())
-                gscene.normal_buffer[i].resize_and_copy_from_host(mesh->normals);
+                gscene.original_normal_buffer[i].resize_and_copy_from_host(mesh->normals);
             if (!meshes[i]->tangents.empty())
-                gscene.tangent_buffer[i].resize_and_copy_from_host(mesh->tangents);
+                gscene.original_tangent_buffer[i].resize_and_copy_from_host(mesh->tangents);
             gscene.bone_id_buffer[i].resize_and_copy_from_host(mesh->bone_ids);
             gscene.bone_weight_buffer[i].resize_and_copy_from_host(mesh->bone_weights);
         }
+#endif
     }
 
     vector<GTriangleMesh> gmeshes(mesh_num);
     for (int i = 0; i < mesh_num; i++)
     {
-        gmeshes[i].vertices = gscene.animated_vertex_buffer[i].data();
+        gmeshes[i].vertices = gscene.vertex_buffer[i].data();
         gmeshes[i].indices = gscene.index_buffer[i].data();
-        gmeshes[i].normals = gscene.animated_normal_buffer[i].data();
-        gmeshes[i].tangents = gscene.animated_tangent_buffer[i].data();
+        gmeshes[i].normals = gscene.normal_buffer[i].data();
+        gmeshes[i].tangents = gscene.tangent_buffer[i].data();
         gmeshes[i].texcoords = gscene.texcoord_buffer[i].data();
 
         gmeshes[i].material = gscene.material_buffer.data() + meshes[i]->material_id;
@@ -179,19 +201,7 @@ void Scene::build_gscene_meshes()
 
 void Scene::build_gscene_instances()
 {
-    int num_instances = (int)instances.size();
-
-    gscene.instance_buffer.resize(num_instances);
-    gscene.instance_meshid_buffer.resize(num_instances);
     gscene.instance_transform_buffer.resize_and_copy_from_host(instance_transforms);
-
-    vector<GInstance> ginstances(num_instances);
-    for (int i = 0; i < num_instances; i++)
-    {
-        ginstances[i].transform = gscene.instance_transform_buffer.data() + i;
-        ginstances[i].mesh = gscene.mesh_buffer.data() + instances[i];
-    }
-    gscene.instance_buffer.resize_and_copy_from_host(ginstances);
 }
 
 void Scene::build_gscene_lights()
@@ -232,8 +242,10 @@ void Scene::build_gscene_lights()
         weight_sum += area * material->intensity;
         gscene.light_area_buffer[light_id].resize_and_copy_from_host(areas);
 
+        area_lights[light_id].mesh = gscene.mesh_buffer.data() + instances[i];
+        area_lights[light_id].transform = gscene.instance_transform_buffer.data() + i;
+
         area_lights[light_id].face_num = face_num;
-        area_lights[light_id].instance = gscene.instance_buffer.data() + i;
         area_lights[light_id].areas = gscene.light_area_buffer[light_id].data();
         area_lights[light_id].area_sum = area;
     }
@@ -252,7 +264,11 @@ void Scene::build_gscene_lights()
     }
     gscene.environment_light_buffer.resize_and_copy_from_host(&env_light, 1);
 
-    Light light(num_light, gscene.area_light_buffer.data(), weight_sum, gscene.environment_light_buffer.data());
+    Light light;
+    light.num = num_light;
+    light.lights = gscene.area_light_buffer.data();
+    light.weight_sum = weight_sum;
+    light.env_light = gscene.environment_light_buffer.data();
     gscene.light_buffer.resize_and_copy_from_host(&light, 1);
 }
 
@@ -271,6 +287,7 @@ void Scene::compute_aabb()
 
 void Scene::update(float t)
 {
+    if (!dynamic) return;
     update_node(root, t, Transform());
     update_gscene();
 }
@@ -279,22 +296,31 @@ void Scene::update_node(shared_ptr<SceneGraphNode> node, float t, const Transfor
 {
     Transform node_transform = node->transform;
     if (node->animation_id != -1)
+    {
+        // for (int i = 0; i < 4; i++)
+        // {
+        //     for (int j = 0; j < 4; j++)
+        //         cout << node_transform[i][j] << " ";
+        //     cout << endl;
+        // }
         node_transform = animations[node->animation_id]->get_transform(t);
+        // for (int i = 0; i < 4; i++)
+        // {
+        //     for (int j = 0; j < 4; j++)
+        //         cout << node_transform[i][j] << " ";
+        //     cout << endl;
+        // }
+        // exit(-1);
+    }
     Transform global_transform = parent_transform * node_transform;
 
     for (auto id : node->instance_ids)
         instance_transforms[id] = global_transform;
 
-    // if (node->instance_id != -1)
-    // {
-    //     auto instance = instances[node->instance_id];
-    //     instance_transforms[node->instance_id] = global_transform;
-    // }
-    // else if (node->bone_id != -1)
-    // {
-    //     auto& bone = bones[node->bone_id];
-    //     bone_transforms[node->bone_id] = global_transform * bone.offset;
-    // }
+#ifndef SRT_HIGH_PERFORMANCE
+    if (node->bone_id != -1)
+        bone_transforms[node->bone_id] = global_transform * bones[node->bone_id].offset;
+#endif
 
     for (auto& child : node->children)
         update_node(child, t, global_transform);
@@ -302,12 +328,68 @@ void Scene::update_node(shared_ptr<SceneGraphNode> node, float t, const Transfor
 
 void Scene::update_gscene()
 {
-    if (!bones.empty())
-        gscene.bone_transform_buffer.copy_from_host(bone_transforms);
     gscene.instance_transform_buffer.copy_from_host(instance_transforms);
+
+#ifndef SRT_HIGH_PERFORMANCE
+    if (bones.empty())
+        return;
+
+    gscene.bone_transform_buffer.copy_from_host(bone_transforms);
+    for (int i = 0; i < (int)meshes.size(); i++)
+    {
+        if (!meshes[i]->has_bone)
+            continue;
+
+        int num_vertices = meshes[i]->vertices.size();
+        int num_bones = bones.size();
+        Transform* bone_transforms = gscene.bone_transform_buffer.data();
+        int* bone_ids = gscene.bone_id_buffer[i].data();
+        float* bone_weights = gscene.bone_weight_buffer[i].data();
+
+        float3* vertices = gscene.vertex_buffer[i].data();
+        float3* normals = gscene.normal_buffer[i].data();
+        float3* tangents = gscene.tangent_buffer[i].data();
+        float3* original_vertices = gscene.original_vertex_buffer[i].data();
+        float3* original_normals = gscene.original_normal_buffer[i].data();
+        float3* original_tangents = gscene.original_tangent_buffer[i].data();
+
+        tcnn::parallel_for_gpu(num_vertices, [=] __device__(int idx) {
+
+            vertices[idx] = make_float3(0.0f);
+            if (normals) normals[idx] = make_float3(0.0f);
+            if (tangents) tangents[idx] = make_float3(0.0f);
+
+            for (int j = 0; j < MAX_BONE_PER_VERTEX; j++)
+            {
+                int bone_id = bone_ids[idx * MAX_BONE_PER_VERTEX + j];
+                float bone_weight = bone_weights[idx * MAX_BONE_PER_VERTEX + j];
+
+                if (bone_id == -1)
+                {
+                    if (j == 0)  // no bone assigned
+                    {
+                        vertices[idx] = original_vertices[idx];
+                        if (normals) normals[idx] = original_normals[idx];
+                        if (tangents) tangents[idx] = original_tangents[idx];
+                    }
+                    break;
+                }
+                if (bone_id >= num_bones)
+                    continue;
+
+                Transform& t = bone_transforms[bone_id];
+                vertices[idx] += t.apply_point(original_vertices[idx]) * bone_weight;
+                if (normals) normals[idx] += t.apply_vector(original_normals[idx]) * bone_weight;
+                if (tangents) tangents[idx] += t.apply_vector(original_tangents[idx]) * bone_weight;
+            }
+
+        });
+    }
+    checkCudaErrors(cudaDeviceSynchronize());
+#endif
 }
 
 void Scene::render_ui()
 {
-
+    ImGui::Checkbox("Dynamic", &dynamic);
 }

@@ -77,30 +77,30 @@ void Renderer::load_scene(const json& config)
         scene->set_camera(camera);
 
         // load environment light
-        // if (config.find("environment") != config.end())
-        // {
-        //     json env_config = config.at("environment");
-        //     string env_type = env_config.at("type");
-        //     if (env_type == "constant")
-        //         scene->set_background(vec_to_f3(env_config.at("color")));
-        //     else if (env_type == "uvmap")
-        //     {
-        //         string env_path = (config_path.parent_path() / env_config.at("path").get<string>()).string();
-        //         scene->load_environment_map(vector<string>({ env_path }));
-        //     }
-        //     else if (env_type == "cubemap")
-        //     {
-        //         vector<string> paths;
-        //         for (auto& p : env_config.at("path"))
-        //             paths.push_back((config_path.parent_path() / p.get<string>()).string());
-        //         scene->load_environment_map(paths);
-        //     }
-        //     else
-        //     {
-        //         cout << "ERROR::Unknown environment type: " << env_type << endl;
-        //         exit(-1);
-        //     }
-        // }
+        if (config.find("environment") != config.end())
+        {
+            json env_config = config.at("environment");
+            string env_type = env_config.at("type");
+            if (env_type == "constant")
+                scene->set_background(vec_to_f3(env_config.at("color")));
+            // else if (env_type == "uvmap")
+            // {
+            //     string env_path = (config_path.parent_path() / env_config.at("path").get<string>()).string();
+            //     scene->load_environment_map(vector<string>({ env_path }));
+            // }
+            // else if (env_type == "cubemap")
+            // {
+            //     vector<string> paths;
+            //     for (auto& p : env_config.at("path"))
+            //         paths.push_back((config_path.parent_path() / p.get<string>()).string());
+            //     scene->load_environment_map(paths);
+            // }
+            else
+            {
+                cout << "ERROR::Unknown environment type: " << env_type << endl;
+                exit(-1);
+            }
+        }
     }
 
     scene->compute_aabb();
@@ -112,11 +112,11 @@ void ImageRenderer::run()
 {
     {
         PROFILE("render");
-        float t = 0.2f;
-        scene->update(t);
+        // float t = 0.2f;
+        // scene->update(t);
         for (auto pass : passes)
         {
-            pass->update();
+            // pass->update();
             pass->render(film);
         }
 
@@ -144,11 +144,11 @@ void InteractiveRenderer::run()
     {
         gui->begin_frame();
 
-        // scene->update(t);
+        scene->update(t);
         scene->render_ui();
         for (auto pass : passes)
         {
-            // pass->update();
+            pass->update();
             pass->render(film);
             pass->render_ui();
         }
@@ -159,13 +159,18 @@ void InteractiveRenderer::run()
 
         auto end = std::chrono::high_resolution_clock::now();
         t = std::chrono::duration<float>(end - start).count();
+        if (!scene->dynamic)
+        {
+            t = 0;
+            start = std::chrono::high_resolution_clock::now();
+        }
     }
 }
 
 void VideoRenderer::run()
 {
     assert(frame > 0);
-    
+
     string command = "mkdir temporary_images";
     int result = std::system(command.c_str());
     if (result != 0)

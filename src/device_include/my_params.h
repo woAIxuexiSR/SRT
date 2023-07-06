@@ -16,6 +16,5 @@ public:
     float3 color;
     const GMaterial* mat;
 
-    bool inner;
     int light_id;
 };

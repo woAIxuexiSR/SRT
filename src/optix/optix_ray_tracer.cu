@@ -64,10 +64,16 @@ void OptixRayTracer::create_module(const string& ptx)
     module_compile_options.optLevel = OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
     module_compile_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT;
 
+#if (OPTIX_VERSION >= 70700)
+#define OPTIX_MODULE_CREATE optixModuleCreate
+#else
+#define OPTIX_MODULE_CREATE optixModuleCreateFromPTX
+#endif
+
     // create module
     char log[2048];
     size_t log_size = sizeof(log);
-    OPTIX_CHECK(optixModuleCreateFromPTX(
+    OPTIX_CHECK(OPTIX_MODULE_CREATE(
         context,
         &module_compile_options,
         &pipeline_compile_options,
@@ -204,12 +210,11 @@ void OptixRayTracer::create_pipeline(const vector<string>& ptxs)
     }
 }
 
-OptixTraversableHandle OptixRayTracer::build_as_from_input(const vector<OptixBuildInput>& inputs, GPUMemory<unsigned char>& as_buffer, bool update)
+OptixTraversableHandle OptixRayTracer::build_as_from_input(const vector<OptixBuildInput>& inputs, GPUMemory<unsigned char>& as_buffer, bool compact, bool update)
 {
     OptixAccelBuildOptions accel_options = {};
-    accel_options.buildFlags = OPTIX_BUILD_FLAG_ALLOW_UPDATE
-        | OPTIX_BUILD_FLAG_ALLOW_COMPACTION
-        | OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+    accel_options.buildFlags = OPTIX_BUILD_FLAG_ALLOW_UPDATE | OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+    if (compact) accel_options.buildFlags |= OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
     accel_options.motionOptions.numKeys = 1;  // disable motion
     accel_options.operation = update ? OPTIX_BUILD_OPERATION_UPDATE : OPTIX_BUILD_OPERATION_BUILD;
 
@@ -222,45 +227,67 @@ OptixTraversableHandle OptixRayTracer::build_as_from_input(const vector<OptixBui
         &blas_buffer_sizes
     ));
 
-    GPUMemory<uint64_t> compacted_size_buffer(1);
-    OptixAccelEmitDesc emit_desc;
-    emit_desc.type = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
-    emit_desc.result = (CUdeviceptr)compacted_size_buffer.data();
-
-    GPUMemory<unsigned char> temp_buffer(blas_buffer_sizes.tempSizeInBytes);
-    GPUMemory<unsigned char> output_buffer(blas_buffer_sizes.outputSizeInBytes);
+    size_t temp_size = update ? blas_buffer_sizes.tempUpdateSizeInBytes : blas_buffer_sizes.tempSizeInBytes;
+    GPUMemory<unsigned char> temp_buffer(temp_size);
 
     OptixTraversableHandle traversable{ 0 };
-    OPTIX_CHECK(optixAccelBuild(
-        context,
-        stream,
-        &accel_options,
-        inputs.data(),
-        (unsigned)inputs.size(),
-        (CUdeviceptr)temp_buffer.data(),
-        blas_buffer_sizes.tempSizeInBytes,
-        (CUdeviceptr)output_buffer.data(),
-        blas_buffer_sizes.outputSizeInBytes,
-        &traversable,
-        &emit_desc,
-        1
-    ));
-    checkCudaErrors(cudaDeviceSynchronize());
+    if (compact)
+    {
+        GPUMemory<uint64_t> compacted_size_buffer(1);
+        OptixAccelEmitDesc emit_desc;
+        emit_desc.type = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
+        emit_desc.result = (CUdeviceptr)compacted_size_buffer.data();
 
-    uint64_t compacted_size;
-    compacted_size_buffer.copy_to_host(&compacted_size);
+        GPUMemory<unsigned char> output_buffer(blas_buffer_sizes.outputSizeInBytes);
+        OPTIX_CHECK(optixAccelBuild(
+            context,
+            stream,
+            &accel_options,
+            inputs.data(),
+            (unsigned)inputs.size(),
+            (CUdeviceptr)temp_buffer.data(),
+            blas_buffer_sizes.tempSizeInBytes,
+            (CUdeviceptr)output_buffer.data(),
+            blas_buffer_sizes.outputSizeInBytes,
+            &traversable,
+            &emit_desc,
+            1
+        ));
+        checkCudaErrors(cudaDeviceSynchronize());
 
-    as_buffer.resize(compacted_size);
-    OPTIX_CHECK(optixAccelCompact(
-        context,
-        stream,
-        traversable,
-        (CUdeviceptr)as_buffer.data(),
-        compacted_size,
-        &traversable
-    ));
-    checkCudaErrors(cudaDeviceSynchronize());
+        uint64_t compacted_size;
+        compacted_size_buffer.copy_to_host(&compacted_size);
 
+        as_buffer.resize(compacted_size);
+        OPTIX_CHECK(optixAccelCompact(
+            context,
+            stream,
+            traversable,
+            (CUdeviceptr)as_buffer.data(),
+            compacted_size,
+            &traversable
+        ));
+        checkCudaErrors(cudaDeviceSynchronize());
+    }
+    else
+    {
+        as_buffer.resize(blas_buffer_sizes.outputSizeInBytes);
+        OPTIX_CHECK(optixAccelBuild(
+            context,
+            stream,
+            &accel_options,
+            inputs.data(),
+            (unsigned)inputs.size(),
+            (CUdeviceptr)temp_buffer.data(),
+            blas_buffer_sizes.tempSizeInBytes,
+            (CUdeviceptr)as_buffer.data(),
+            blas_buffer_sizes.outputSizeInBytes,
+            &traversable,
+            nullptr,
+            0
+        ));
+        checkCudaErrors(cudaDeviceSynchronize());
+    }
     return traversable;
 }
 
@@ -269,40 +296,40 @@ void OptixRayTracer::build_gas()
     int mesh_num = (int)scene->meshes.size();
     GScene& gscene = scene->gscene;
 
-    vector<OptixBuildInput> triangle_input(mesh_num);
-    vector<CUdeviceptr> d_vertices(mesh_num);
-    vector<CUdeviceptr> d_indices(mesh_num);
-    vector<uint32_t> triangle_input_flags(mesh_num);
-
+    d_vertices.resize(mesh_num);
+    gas_input_flags.resize(mesh_num);
+    gas_inputs.resize(mesh_num);
     gas_traversable.resize(mesh_num);
     gas_buffer.resize(mesh_num);
 
     for (int i = 0; i < mesh_num; i++)
     {
-        triangle_input[i] = {};
-        triangle_input[i].type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+        gas_inputs[i] = {};
+        gas_inputs[i].type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
-        d_vertices[i] = (CUdeviceptr)gscene.animated_vertex_buffer[i].data();
-        d_indices[i] = (CUdeviceptr)gscene.index_buffer[i].data();
+        d_vertices[i] = (CUdeviceptr)gscene.vertex_buffer[i].data();
+        // d_indices[i] = (CUdeviceptr)gscene.index_buffer[i].data();
 
-        triangle_input[i].triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
-        triangle_input[i].triangleArray.vertexStrideInBytes = sizeof(float3);
-        triangle_input[i].triangleArray.numVertices = (unsigned)scene->meshes[i]->vertices.size();
-        triangle_input[i].triangleArray.vertexBuffers = &d_vertices[i];
+        gas_inputs[i].triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
+        gas_inputs[i].triangleArray.vertexStrideInBytes = sizeof(float3);
+        gas_inputs[i].triangleArray.numVertices = (unsigned)scene->meshes[i]->vertices.size();
+        gas_inputs[i].triangleArray.vertexBuffers = &d_vertices[i];
 
-        triangle_input[i].triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-        triangle_input[i].triangleArray.indexStrideInBytes = sizeof(int3);
-        triangle_input[i].triangleArray.numIndexTriplets = (unsigned)scene->meshes[i]->indices.size();
-        triangle_input[i].triangleArray.indexBuffer = d_indices[i];
+        gas_inputs[i].triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+        gas_inputs[i].triangleArray.indexStrideInBytes = sizeof(int3);
+        gas_inputs[i].triangleArray.numIndexTriplets = (unsigned)scene->meshes[i]->indices.size();
+        // gas_inputs[i].triangleArray.indexBuffer = d_indices[i];
+        gas_inputs[i].triangleArray.indexBuffer = (CUdeviceptr)gscene.index_buffer[i].data();
 
-        triangle_input_flags[i] = OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT;
-        triangle_input[i].triangleArray.flags = &triangle_input_flags[i];
-        triangle_input[i].triangleArray.numSbtRecords = 1;
-        triangle_input[i].triangleArray.sbtIndexOffsetBuffer = 0;
-        triangle_input[i].triangleArray.sbtIndexOffsetSizeInBytes = 0;
-        triangle_input[i].triangleArray.sbtIndexOffsetStrideInBytes = 0;
+        gas_input_flags[i] = OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT;
+        gas_inputs[i].triangleArray.flags = &gas_input_flags[i];
+        gas_inputs[i].triangleArray.numSbtRecords = 1;
+        gas_inputs[i].triangleArray.sbtIndexOffsetBuffer = 0;
+        gas_inputs[i].triangleArray.sbtIndexOffsetSizeInBytes = 0;
+        gas_inputs[i].triangleArray.sbtIndexOffsetStrideInBytes = 0;
 
-        gas_traversable[i] = build_as_from_input({ triangle_input[i] }, gas_buffer[i], false);
+        bool compact = scene->animations.empty();
+        gas_traversable[i] = build_as_from_input({ gas_inputs[i] }, gas_buffer[i], compact, false);
     }
 }
 
@@ -320,15 +347,14 @@ void OptixRayTracer::build_ias()
         ias_instances[i].traversableHandle = gas_traversable[scene->instances[i]];
         memcpy(ias_instances[i].transform, &(scene->instance_transforms[i]), sizeof(float) * 12);
     }
+    ias_instances_buffer.resize_and_copy_from_host(ias_instances);
 
-    GPUMemory<OptixInstance> d_instances;
-    d_instances.resize_and_copy_from_host(ias_instances);
+    ias_input.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
+    ias_input.instanceArray.numInstances = instance_num;
+    ias_input.instanceArray.instances = (CUdeviceptr)ias_instances_buffer.data();
 
-    OptixBuildInput instance_input = {};
-    instance_input.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
-    instance_input.instanceArray.numInstances = instance_num;
-    instance_input.instanceArray.instances = (CUdeviceptr)d_instances.data();
-    ias_traversable = build_as_from_input({ instance_input }, ias_buffer, false);
+    bool compact = scene->animations.empty();
+    ias_traversable = build_as_from_input({ ias_input }, ias_buffer, compact, false);
 }
 
 void OptixRayTracer::build_sbt()
@@ -368,7 +394,8 @@ void OptixRayTracer::build_sbt()
                 HitgroupSBTRecord hitgroup_record;
                 OPTIX_CHECK(optixSbtRecordPackHeader(module_pgs[i].hitgroupPGs[j], &hitgroup_record));
 
-                hitgroup_record.data.instance = gscene.instance_buffer.data() + k;
+                hitgroup_record.data.mesh = gscene.mesh_buffer.data() + scene->instances[k];
+                hitgroup_record.data.transform = gscene.instance_transform_buffer.data() + k;
                 hitgroup_record.data.light_id = gscene.instance_light_id[k];
 
                 hitgroup_records.push_back(hitgroup_record);
@@ -415,17 +442,21 @@ OptixRayTracer::OptixRayTracer(const vector<string>& _ptxfiles, shared_ptr<Scene
 
 void OptixRayTracer::update_as()
 {
+    if(!scene->dynamic)
+        return;
+
+#ifndef SRT_HIGH_PERFORMANCE
+    if (!scene->bones.empty())
+        for (int i = 0; i < (int)scene->meshes.size(); i++)
+            gas_traversable[i] = build_as_from_input({ gas_inputs[i] }, gas_buffer[i], false, true);
+#endif
+
     int instance_num = (int)scene->instances.size();
-
     for (int i = 0; i < instance_num; i++)
+    {
+        ias_instances[i].traversableHandle = gas_traversable[scene->instances[i]];
         memcpy(ias_instances[i].transform, &(scene->instance_transforms[i]), sizeof(float) * 12);
-
-    GPUMemory<OptixInstance> d_instances;
-    d_instances.resize_and_copy_from_host(ias_instances);
-
-    OptixBuildInput instance_input = {};
-    instance_input.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
-    instance_input.instanceArray.numInstances = instance_num;
-    instance_input.instanceArray.instances = (CUdeviceptr)d_instances.data();
-    ias_traversable = build_as_from_input({ instance_input }, ias_buffer, false);
+    }
+    ias_instances_buffer.copy_from_host(ias_instances);
+    ias_traversable = build_as_from_input({ ias_input }, ias_buffer, false, true);
 }

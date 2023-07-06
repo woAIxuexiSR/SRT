@@ -1,0 +1,11 @@
+Model Information:
+* title:	Broken Steampunk Clock
+* source:	https://sketchfab.com/3d-models/broken-steampunk-clock-c440d78639b74e77ba6ae375f9cbf5b7
+* author:	VassKacsoHunor (https://sketchfab.com/VassKacsoHunor)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Broken Steampunk Clock" (https://sketchfab.com/3d-models/broken-steampunk-clock-c440d78639b74e77ba6ae375f9cbf5b7) by VassKacsoHunor (https://sketchfab.com/VassKacsoHunor) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
