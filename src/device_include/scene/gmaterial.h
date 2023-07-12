@@ -26,7 +26,7 @@ public:
     }
     __host__ __device__ bool is_transmissive() const
     {
-        return (bxdf.type == BxDF::Type::Dielectric)
+        return (bxdf.type == BxDF::Type::Dielectric) || (bxdf.type == BxDF::Type::DiffuseTransmission)
             || (bxdf.type == BxDF::Type::Disney && bxdf.metallic < 1.0f && bxdf.specTrans > 0.0f);
     }
 

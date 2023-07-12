@@ -27,7 +27,7 @@ public:
     Renderer(const string& _config_path) : config_path(_config_path) {}
     ~Renderer() { Profiler::reset(); }
     void set_scene(shared_ptr<Scene> _scene) { scene = _scene; }
-    void resize(int _w, int _h);
+    void resize(int _w, int _h) { width = _w, height = _h; }
 
     virtual void load_passes(const json& config);
     virtual void load_scene(const json& config);

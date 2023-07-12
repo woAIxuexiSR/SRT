@@ -17,6 +17,7 @@ public:
 
     __host__ __device__ Quaternion operator+(const Quaternion& other) const { return Quaternion(q + other.q); }
     __host__ __device__ Quaternion operator-(const Quaternion& other) const { return Quaternion(q - other.q); }
+    __host__ __device__ Quaternion operator-() const { return Quaternion(-q.x, -q.y, -q.z, -q.w); }
     __host__ __device__ Quaternion operator*(float s) const { return Quaternion(q * s); }
 
     __host__ __device__ Quaternion operator*(const Quaternion& other) const
@@ -103,7 +104,11 @@ public:
     // the quaternion must be normalized, t in [0, 1]
     __host__ __device__ static Quaternion Slerp(const Quaternion& q1, const Quaternion& q2, float t)
     {
-        float cos_theta = clamp(dot(q1.q, q2.q), 0.0f, 1.0f);
+        float cos_theta = clamp(dot(q1.q, q2.q), -1.0f, 1.0f);
+        if (abs(cos_theta) > 1 - EPSILON)
+            return q1 * (1 - t) + q2 * t;
+        if (cos_theta < 0.0f)
+            return Slerp(q1, -q2, t);
         float theta = acos(cos_theta);
         float theta_prime = theta * t;
         Quaternion qperp = Normalize(q2 - q1 * cos_theta);

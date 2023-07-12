@@ -39,6 +39,8 @@ int Scene::find_texture(const string& name)
 int Scene::add_animation(shared_ptr<Animation> animation)
 {
     int id = animations.size();
+    if (animation->name == "")
+        animation->name = "animation_" + std::to_string(id);
     animations.push_back(animation);
     return id;
 }
@@ -59,6 +61,16 @@ int Scene::add_bone(const Bone& bone)
     return id;
 }
 
+void Scene::add_instance(const Transform& transform, shared_ptr<TriangleMesh> mesh)
+{
+    int id = meshes.size();
+    if (mesh->name == "")
+        mesh->name = "mesh_" + std::to_string(id);
+    meshes.push_back(mesh);
+    instances.push_back(id);
+    instance_transforms.push_back(transform);
+}
+
 /* GPU build functions */
 
 void Scene::build_gscene()
@@ -72,12 +84,12 @@ void Scene::build_gscene()
 
 void Scene::build_gscene_textures()
 {
-    int num_textures = (int)textures.size();
+    int texture_num = (int)textures.size();
 
-    gscene.texture_arrays.resize(num_textures);
-    gscene.texture_objects.resize(num_textures);
+    gscene.texture_arrays.resize(texture_num);
+    gscene.texture_objects.resize(texture_num);
 
-    for (int i = 0; i < num_textures; i++)
+    for (int i = 0; i < texture_num; i++)
     {
         auto& image = textures[i]->image;
         cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<uchar4>();
@@ -121,10 +133,10 @@ void Scene::build_gscene_textures()
 
 void Scene::build_gscene_materials()
 {
-    int num_materials = (int)materials.size();
+    int material_num = (int)materials.size();
 
-    vector<GMaterial> gmaterials(num_materials);
-    for (int i = 0; i < num_materials; i++)
+    vector<GMaterial> gmaterials(material_num);
+    for (int i = 0; i < material_num; i++)
     {
         gmaterials[i].bxdf = materials[i]->bxdf;
         gmaterials[i].base_color = materials[i]->base_color;
@@ -148,15 +160,13 @@ void Scene::build_gscene_meshes()
     gscene.tangent_buffer.resize(mesh_num);
     gscene.texcoord_buffer.resize(mesh_num);
 
-#ifndef SRT_HIGH_PERFORMANCE
     gscene.original_vertex_buffer.resize(mesh_num);
     gscene.original_normal_buffer.resize(mesh_num);
     gscene.original_tangent_buffer.resize(mesh_num);
     gscene.bone_id_buffer.resize(mesh_num);
     gscene.bone_weight_buffer.resize(mesh_num);
-    if (!bones.empty())
+    if (has_bone())
         gscene.bone_transform_buffer.resize_and_copy_from_host(bone_transforms);
-#endif
 
     for (int i = 0; i < mesh_num; i++)
     {
@@ -171,7 +181,6 @@ void Scene::build_gscene_meshes()
         if (!meshes[i]->texcoords.empty())
             gscene.texcoord_buffer[i].resize_and_copy_from_host(mesh->texcoords);
 
-#ifndef SRT_HIGH_PERFORMANCE
         if (mesh->has_bone)
         {
             gscene.original_vertex_buffer[i].resize_and_copy_from_host(mesh->vertices);
@@ -182,7 +191,6 @@ void Scene::build_gscene_meshes()
             gscene.bone_id_buffer[i].resize_and_copy_from_host(mesh->bone_ids);
             gscene.bone_weight_buffer[i].resize_and_copy_from_host(mesh->bone_weights);
         }
-#endif
     }
 
     vector<GTriangleMesh> gmeshes(mesh_num);
@@ -208,26 +216,26 @@ void Scene::build_gscene_lights()
 {
     gscene.instance_light_id.resize(instances.size(), -1);
 
-    int num_light = 0;
+    int light_num = 0;
     for (int i = 0; i < (int)instances.size(); i++)
     {
         auto material = materials[meshes[instances[i]]->material_id];
         if (material->intensity <= 0.0f) continue;
 
-        gscene.instance_light_id[i] = num_light;
-        num_light++;
+        gscene.instance_light_id[i] = light_num;
+        light_num++;
     }
 
-    gscene.light_area_buffer.resize(num_light);
-    vector<AreaLight> area_lights(num_light);
+    gscene.light_area_buffer.resize(light_num);
+    vector<AreaLight> area_lights(light_num);
     float weight_sum = 0.0f;
     for (int i = 0; i < (int)instances.size(); i++)
     {
-        auto material = materials[meshes[instances[i]]->material_id];
         if (gscene.instance_light_id[i] == -1) continue;
 
         int light_id = gscene.instance_light_id[i];
         auto mesh = meshes[instances[i]];
+        auto material = materials[meshes[instances[i]]->material_id];
 
         int face_num = (int)mesh->indices.size();
         float area = 0.0f;
@@ -265,7 +273,7 @@ void Scene::build_gscene_lights()
     gscene.environment_light_buffer.resize_and_copy_from_host(&env_light, 1);
 
     Light light;
-    light.num = num_light;
+    light.num = light_num;
     light.lights = gscene.area_light_buffer.data();
     light.weight_sum = weight_sum;
     light.env_light = gscene.environment_light_buffer.data();
@@ -287,40 +295,26 @@ void Scene::compute_aabb()
 
 void Scene::update(float t)
 {
-    if (!dynamic) return;
-    update_node(root, t, Transform());
-    update_gscene();
+    if (has_animation() && root && enable_animation)
+    {
+        update_node(root, t, Transform());
+        update_gscene();
+    }
 }
 
 void Scene::update_node(shared_ptr<SceneGraphNode> node, float t, const Transform& parent_transform)
 {
     Transform node_transform = node->transform;
     if (node->animation_id != -1)
-    {
-        // for (int i = 0; i < 4; i++)
-        // {
-        //     for (int j = 0; j < 4; j++)
-        //         cout << node_transform[i][j] << " ";
-        //     cout << endl;
-        // }
         node_transform = animations[node->animation_id]->get_transform(t);
-        // for (int i = 0; i < 4; i++)
-        // {
-        //     for (int j = 0; j < 4; j++)
-        //         cout << node_transform[i][j] << " ";
-        //     cout << endl;
-        // }
-        // exit(-1);
-    }
     Transform global_transform = parent_transform * node_transform;
 
+    // update instance transforms
     for (auto id : node->instance_ids)
         instance_transforms[id] = global_transform;
-
-#ifndef SRT_HIGH_PERFORMANCE
+    // update bone transforms
     if (node->bone_id != -1)
         bone_transforms[node->bone_id] = global_transform * bones[node->bone_id].offset;
-#endif
 
     for (auto& child : node->children)
         update_node(child, t, global_transform);
@@ -330,19 +324,18 @@ void Scene::update_gscene()
 {
     gscene.instance_transform_buffer.copy_from_host(instance_transforms);
 
-#ifndef SRT_HIGH_PERFORMANCE
-    if (bones.empty())
+    if (!has_bone())
         return;
 
     gscene.bone_transform_buffer.copy_from_host(bone_transforms);
+    Transform* bone_transforms = gscene.bone_transform_buffer.data();
     for (int i = 0; i < (int)meshes.size(); i++)
     {
         if (!meshes[i]->has_bone)
             continue;
 
-        int num_vertices = meshes[i]->vertices.size();
-        int num_bones = bones.size();
-        Transform* bone_transforms = gscene.bone_transform_buffer.data();
+        int vertex_num = meshes[i]->vertices.size();
+        int bone_num = bones.size();
         int* bone_ids = gscene.bone_id_buffer[i].data();
         float* bone_weights = gscene.bone_weight_buffer[i].data();
 
@@ -353,7 +346,7 @@ void Scene::update_gscene()
         float3* original_normals = gscene.original_normal_buffer[i].data();
         float3* original_tangents = gscene.original_tangent_buffer[i].data();
 
-        tcnn::parallel_for_gpu(num_vertices, [=] __device__(int idx) {
+        tcnn::parallel_for_gpu(vertex_num, [=] __device__(int idx) {
 
             vertices[idx] = make_float3(0.0f);
             if (normals) normals[idx] = make_float3(0.0f);
@@ -374,7 +367,7 @@ void Scene::update_gscene()
                     }
                     break;
                 }
-                if (bone_id >= num_bones)
+                if (bone_id >= bone_num)
                     continue;
 
                 Transform& t = bone_transforms[bone_id];
@@ -386,10 +379,114 @@ void Scene::update_gscene()
         });
     }
     checkCudaErrors(cudaDeviceSynchronize());
-#endif
 }
 
 void Scene::render_ui()
 {
-    ImGui::Checkbox("Dynamic", &dynamic);
+    if (!ImGui::CollapsingHeader("Scene"))
+        return;
+
+    ImGui::Checkbox("Enable animation", &enable_animation);
+
+    if (ImGui::TreeNode("Camera"))
+    {
+        CameraController& controller = camera->controller;
+        bool changed = false;
+
+        ImGui::Text("position: (%.1f, %.1f, %.1f), target: (%.1f, %.1f, %.1f)",
+            controller.pos.x, controller.pos.y, controller.pos.z,
+            controller.target.x, controller.target.y, controller.target.z);
+        ImGui::Text("z: (%.1f, %.1f, %.1f), x: (%.1f, %.1f, %.1f), y: (%.1f, %.1f, %.1f)",
+            controller.z.x, controller.z.y, controller.z.z,
+            controller.x.x, controller.x.y, controller.x.z,
+            controller.y.x, controller.y.y, controller.y.z);
+
+        ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.21f);
+        changed |= ImGui::DragFloat("theta", &controller.theta, 0.1f, 1.0f, 179.0f);
+        ImGui::SameLine();
+        changed |= ImGui::DragFloat("phi", &controller.phi, 0.1f);
+        ImGui::SameLine();
+        changed |= ImGui::DragFloat("fov", &camera->fov, 0.1f, 1.0f, 90.0f);
+        ImGui::PopItemWidth();
+
+        changed |= ImGui::Combo("camera type", (int*)&camera->type, "Perspective\0Orthographic\0ThinLens\0Environment\0\0");
+        changed |= ImGui::Combo("camera controller type", (int*)&controller.type, "Orbit\0FPS\0\0");
+
+        if (changed)
+        {
+            controller.reset();
+            camera->reset();
+            camera->set_moved(true);
+        }
+
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNode("Material"))
+    {
+        bool changed = false;
+        for (int i = 0; i < (int)materials.size(); i++)
+        {
+            if (ImGui::TreeNode(materials[i]->name.c_str()))
+            {
+                changed |= ImGui::Combo("type##Material", (int*)&materials[i]->bxdf.type, "Diffuse\0DiffuseTransmission\0Dielectric\0Disney\0\0");
+                changed |= ImGui::ColorEdit3("base color", &materials[i]->base_color.x);
+
+                if (materials[i]->bxdf.type == BxDF::Type::Disney)
+                {
+                    if (ImGui::TreeNode("disney parameters"))
+                    {
+                        ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.15f);
+                        changed |= ImGui::DragFloat("ior        ", &materials[i]->bxdf.ior, 0.01f, 0.0f, 2.0f);
+                        ImGui::SameLine();
+                        changed |= ImGui::DragFloat("metallic      ", &materials[i]->bxdf.metallic, 0.01f, 0.0f, 1.0f);
+                        ImGui::SameLine();
+                        changed |= ImGui::DragFloat("subsurface  ", &materials[i]->bxdf.subsurface, 0.01f, 0.0f, 1.0f);
+
+
+                        changed |= ImGui::DragFloat("roughness  ", &materials[i]->bxdf.roughness, 0.01f, 0.001f, 1.0f);
+                        ImGui::SameLine();
+                        changed |= ImGui::DragFloat("specular      ", &materials[i]->bxdf.specular, 0.01f, 0.0f, 1.0f);
+                        ImGui::SameLine();
+                        changed |= ImGui::DragFloat("specularTint", &materials[i]->bxdf.specularTint, 0.01f, 0.0f, 1.0f);
+
+                        changed |= ImGui::DragFloat("anisotropic", &materials[i]->bxdf.anisotropic, 0.01f, 0.0f, 1.0f);
+                        ImGui::SameLine();
+                        changed |= ImGui::DragFloat("sheen         ", &materials[i]->bxdf.sheen, 0.01f, 0.0f, 1.0f);
+                        ImGui::SameLine();
+                        changed |= ImGui::DragFloat("sheenTint   ", &materials[i]->bxdf.sheenTint, 0.01f, 0.0f, 1.0f);
+
+                        changed |= ImGui::DragFloat("clearcoat  ", &materials[i]->bxdf.clearcoat, 0.01f, 0.0f, 1.0f);
+                        ImGui::SameLine();
+                        changed |= ImGui::DragFloat("clearcoatGloss", &materials[i]->bxdf.clearcoatGloss, 0.01f, 0.001f, 1.0f);
+                        ImGui::SameLine();
+                        changed |= ImGui::DragFloat("specTrans   ", &materials[i]->bxdf.specTrans, 0.01f, 0.0f, 1.0f);
+                        ImGui::PopItemWidth();
+
+                        ImGui::TreePop();
+                    }
+                }
+                ImGui::TreePop();
+            }
+        }
+        if (changed) build_gscene_materials();
+
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNode("Animation"))
+    {
+        for (int i = 0; i < (int)animations.size();i++)
+        {
+            if (ImGui::TreeNode(animations[i]->name.c_str()))
+            {
+                ImGui::Text("Duration: %.2f", animations[i]->duration);
+                ImGui::Combo("Interpolation type", (int*)&animations[i]->itype, "Linear\0Cubic\0\0");
+                ImGui::Combo("Extrapolation type", (int*)&animations[i]->etype, "Clamp\0Repeat\0Mirror\0\0");
+
+                ImGui::TreePop();
+            }
+        }
+        ImGui::TreePop();
+    }
 }

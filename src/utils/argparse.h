@@ -57,7 +57,7 @@ private:
 
 
 public:
-    argparser(const string& _des): description(_des) {}
+    argparser(const string& _des) : description(_des) {}
 
     argparser& set_program_name(const string& _name)
     {
@@ -141,7 +141,7 @@ public:
 
         if (argc == 1)
         {
-            if(arguments.size() != 0)
+            if (arguments.size() != 0)
             {
                 print_usage();
                 exit(0);

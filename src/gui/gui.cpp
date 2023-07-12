@@ -109,7 +109,7 @@ GUI::GUI(int _w, int _h, shared_ptr<Camera> _c, int n)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    window = glfwCreateWindow(_w, _h, "SuperRay", nullptr, nullptr);
+    window = glfwCreateWindow(_w, _h, "SRT", nullptr, nullptr);
     if (!window)
     {
         cout << "ERROR::Failed to create window" << endl;
@@ -257,7 +257,7 @@ void GUI::begin_frame()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::Begin("SuperRay");
+    ImGui::Begin("SRT");
     ImGui::Text("Application Time %.1f s", ImGui::GetTime());
     ImGui::Text("FPS %.1f", ImGui::GetIO().Framerate);
 }

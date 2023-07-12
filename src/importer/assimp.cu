@@ -7,17 +7,17 @@ Quaternion ai_convert(const aiQuaternion& q) { return Quaternion(q.x, q.y, q.z, 
 string ai_convert(const aiString& s) { return string(s.C_Str()); }
 Transform ai_convert(const aiMatrix4x4& m)
 {
-    Transform t;
-    t[0][0] = m.a1; t[0][1] = m.b1; t[0][2] = m.c1; t[0][3] = m.d1;
-    t[1][0] = m.a2; t[1][1] = m.b2; t[1][2] = m.c2; t[1][3] = m.d2;
-    t[2][0] = m.a3; t[2][1] = m.b3; t[2][2] = m.c3; t[2][3] = m.d3;
-    t[3][0] = m.a4; t[3][1] = m.b4; t[3][2] = m.c4; t[3][3] = m.d4;
-    // return t;
-    return Transform(Transpose(t.get_matrix()));
+    return Transform(SquareMatrix<4>(
+        m.a1, m.a2, m.a3, m.a4,
+        m.b1, m.b2, m.b3, m.b4,
+        m.c1, m.c2, m.c3, m.c4,
+        m.d1, m.d2, m.d3, m.d4
+    ));
 }
 shared_ptr<Material> ai_convert(aiMaterial* amat)
 {
-    aiColor3D diffuse{ 0,0,0 };
+    aiColor3D diffuse_color{ 0,0,0 };
+    aiColor3D specular_color{ 0,0,0 };
     aiColor3D emission{ 0,0,0 };
     float emissiveStrength = 1.0f;
     float ior = 1.5f;
@@ -33,7 +33,8 @@ shared_ptr<Material> ai_convert(aiMaterial* amat)
     float clearcoatGloss = 0.0f;
     float specTrans = 0.0f;
 
-    amat->Get(AI_MATKEY_COLOR_DIFFUSE, diffuse);
+    amat->Get(AI_MATKEY_COLOR_DIFFUSE, diffuse_color);
+    amat->Get(AI_MATKEY_COLOR_SPECULAR, specular_color);
     amat->Get(AI_MATKEY_COLOR_EMISSIVE, emission);
     amat->Get(AI_MATKEY_EMISSIVE_INTENSITY, emissiveStrength);
     amat->Get(AI_MATKEY_REFRACTI, ior);
@@ -52,10 +53,12 @@ shared_ptr<Material> ai_convert(aiMaterial* amat)
     float3 emission_color = ai_convert(emission) * emissiveStrength;
     emissiveStrength = length(emission_color);
     emission_color = emissiveStrength > 0 ? normalize(emission_color) : emission_color;
+    float3 dc = ai_convert(diffuse_color), sc = ai_convert(specular_color);
+    float3 base_color = dot(dc, dc) > 0 ? dc : sc;
 
     shared_ptr<Material> material = make_shared<Material>();
     material->name = ai_convert(amat->GetName());
-    material->base_color = ai_convert(diffuse);
+    material->base_color = base_color;
     material->emission_color = emission_color;
     material->intensity = emissiveStrength;
     material->bxdf.type = BxDF::Type::Disney;
@@ -75,33 +78,6 @@ shared_ptr<Material> ai_convert(aiMaterial* amat)
     return material;
 }
 
-
-void AssimpImporter::import(const string & filename, shared_ptr<Scene> _scene)
-{
-    Assimp::Importer importer;
-    unsigned int flags = 0 | aiProcess_Triangulate
-        | aiProcess_GenNormals
-        | aiProcess_CalcTangentSpace
-        | aiProcess_FlipUVs;
-    ascene = importer.ReadFile(filename, flags);
-
-    if (!ascene || ascene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !ascene->mRootNode)
-    {
-        cout << "ERROR::ASSIMP::" << importer.GetErrorString() << endl;
-        exit(-1);
-    }
-
-    folder = std::filesystem::path(filename).parent_path();
-    scene = _scene;
-
-    load_meshes();
-
-    scene->root = make_shared<SceneGraphNode>();
-    traverse(ascene->mRootNode, scene->root, Transform());
-
-    load_animations();
-}
-
 void AssimpImporter::load_meshes()
 {
     for (int i = 0; i < ascene->mNumMeshes; i++)
@@ -115,21 +91,11 @@ void AssimpImporter::load_meshes()
         vector<float2> texcoords;
         for (int j = 0; j < amesh->mNumVertices; j++)
         {
-            float3 vertex = ai_convert(amesh->mVertices[j]);
-            vertices.push_back(vertex);
-
+            vertices.push_back(ai_convert(amesh->mVertices[j]));
             if (amesh->HasNormals())
-            {
-                float3 normal = ai_convert(amesh->mNormals[j]);
-                normals.push_back(normal);
-            }
-
+                normals.push_back(ai_convert(amesh->mNormals[j]));
             if (amesh->HasTangentsAndBitangents())
-            {
-                float3 tangent = ai_convert(amesh->mTangents[j]);
-                tangents.push_back(tangent);
-            }
-
+                tangents.push_back(ai_convert(amesh->mTangents[j]));
             if (amesh->HasTextureCoords(0))
             {
                 float3 texcoord = ai_convert(amesh->mTextureCoords[0][j]);
@@ -140,21 +106,14 @@ void AssimpImporter::load_meshes()
         {
             aiFace face = amesh->mFaces[j];
             assert(face.mNumIndices == 3);
-            uint3 index = make_uint3(face.mIndices[0], face.mIndices[1], face.mIndices[2]);
-            indices.push_back(index);
+            indices.push_back({ face.mIndices[0], face.mIndices[1], face.mIndices[2] });
         }
+        string name = ai_convert(amesh->mName);
 
-        // load mesh
-        shared_ptr<TriangleMesh> mesh = make_shared<TriangleMesh>();
-        mesh->vertices = vertices;
-        mesh->indices = indices;
-        mesh->normals = normals;
-        mesh->tangents = tangents;
-        mesh->texcoords = texcoords;
-        mesh->name = ai_convert(amesh->mName);
-        mesh->compute_aabb();
+        shared_ptr<TriangleMesh> mesh =
+            make_shared<TriangleMesh>(name, vertices, indices, normals, tangents, texcoords);
 
-        // load mesh's bone weights
+        // load_bone
         load_bones(amesh, mesh);
 
         // load material
@@ -162,51 +121,71 @@ void AssimpImporter::load_meshes()
         shared_ptr<Material> material = ai_convert(amat);
 
         // load texture
-        int texture_id = -1;
-        aiString texname;
-        if (amat->GetTextureCount(aiTextureType_DIFFUSE) > 0
-            && amat->GetTexture(aiTextureType_DIFFUSE, 0, &texname) == AI_SUCCESS)
-        {
-            shared_ptr<Texture> texture = make_shared<Texture>();
-            string filename = (folder / texname.C_Str()).string();
-            texture->image.load_from_file(filename);
-            texture_id = scene->add_texture(texture);
-        }
-        material->color_tex_id = texture_id;
+        material->color_tex_id = load_texture(amat, aiTextureType_DIFFUSE);
+        material->normal_tex_id = load_texture(amat, aiTextureType_NORMALS);
 
+        // add all to scene
         int material_id = scene->add_material(material);
         mesh->material_id = material_id;
+        mesh->compute_aabb();
         scene->meshes.push_back(mesh);
     }
 }
 
 void AssimpImporter::load_bones(aiMesh* amesh, shared_ptr<TriangleMesh> mesh)
 {
-    if (!amesh->HasBones()) return;
+    if (!amesh->HasBones())
+        return;
 
     mesh->reset_bones();
     for (int i = 0; i < amesh->mNumBones; i++)
     {
-        string bone_name = ai_convert(amesh->mBones[i]->mName);
-        int bone_id = scene->find_bone(bone_name);
-        if (bone_id == -1)
+        string name = ai_convert(amesh->mBones[i]->mName);
+
+        int id = -1;
+        auto it = bone_index_map.find(name);
+        if (it != bone_index_map.end())
+            id = it->second;
+        else
         {
             Bone bone;
-            bone.name = bone_name;
+            bone.name = name;
             bone.offset = ai_convert(amesh->mBones[i]->mOffsetMatrix);
-            bone_id = scene->add_bone(bone);
+            id = scene->add_bone(bone);
+            bone_index_map[name] = id;
         }
 
-        auto& weights = amesh->mBones[i]->mWeights;
-        int num_weights = amesh->mBones[i]->mNumWeights;
-        for (int j = 0; j < num_weights; j++)
+        aiVertexWeight* weights = amesh->mBones[i]->mWeights;
+        int weights_num = amesh->mBones[i]->mNumWeights;
+        for (int j = 0; j < weights_num; j++)
         {
-            int vertex_id = weights[j].mVertexId;
+            int vid = weights[j].mVertexId;
             float weight = weights[j].mWeight;
-            assert(vertex_id < mesh->vertices.size());
-            mesh->add_bone_influence(vertex_id, bone_id, weight);
+            assert(vid < mesh->vertices.size());
+            mesh->add_bone_influence(vid, id, weight);
         }
     }
+}
+
+int AssimpImporter::load_texture(aiMaterial* amat, aiTextureType type)
+{
+    aiString texname;
+    if (amat->GetTextureCount(type) <= 0)
+        return -1;
+    if (amat->GetTexture(type, 0, &texname) != AI_SUCCESS)
+        return -1;
+
+    auto it = texture_index_map.find(ai_convert(texname));
+    if (it != texture_index_map.end())
+        return it->second;
+
+    shared_ptr<Texture> texture = make_shared<Texture>();
+    string filename = (folder / texname.C_Str()).string();
+    texture->image.load_from_file(filename);
+    int texture_id = scene->add_texture(texture);
+    texture_index_map[ai_convert(texname)] = texture_id;
+
+    return texture_id;
 }
 
 void AssimpImporter::traverse(aiNode* anode, shared_ptr<SceneGraphNode> node, const Transform& parent_transform)
@@ -218,6 +197,7 @@ void AssimpImporter::traverse(aiNode* anode, shared_ptr<SceneGraphNode> node, co
     Transform global_transform = parent_transform * node->transform;
     for (int i = 0; i < anode->mNumMeshes; i++)
     {
+        // add instance
         int mesh_id = anode->mMeshes[i];
         int instance_id = scene->instances.size();
         scene->instances.push_back(mesh_id);
@@ -225,12 +205,9 @@ void AssimpImporter::traverse(aiNode* anode, shared_ptr<SceneGraphNode> node, co
         node->instance_ids.push_back(instance_id);
     }
 
-    if (anode->mNumMeshes == 0)
-    {
-        int bone_id = scene->find_bone(node->name);
-        if (bone_id != -1)
-            node->bone_id = bone_id;
-    }
+    auto it = bone_index_map.find(node->name);
+    if (it != bone_index_map.end())
+        node->bone_id = it->second;
 
     for (int i = 0; i < anode->mNumChildren; i++)
     {
@@ -287,4 +264,76 @@ void AssimpImporter::load_animations()
             node->animation_id = id;
         }
     }
+}
+
+shared_ptr<TriangleMesh> AssimpImporter::import_mesh(const string& filename)
+{
+    Assimp::Importer importer;
+    unsigned int flags = aiProcess_Triangulate
+        | aiProcess_GenNormals
+        | aiProcess_CalcTangentSpace
+        | aiProcess_FlipUVs;
+    ascene = importer.ReadFile(filename, flags);
+
+    if (!ascene || ascene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !ascene->mRootNode)
+    {
+        cout << "ERROR::ASSIMP::" << importer.GetErrorString() << endl;
+        exit(-1);
+    }
+
+    assert(ascene->mNumMeshes > 0);
+    aiMesh* amesh = ascene->mMeshes[0];
+
+    vector<float3> vertices;
+    vector<uint3> indices;
+    vector<float3> normals;
+    vector<float3> tangents;
+    vector<float2> texcoords;
+    for (int j = 0; j < amesh->mNumVertices; j++)
+    {
+        vertices.push_back(ai_convert(amesh->mVertices[j]));
+        if (amesh->HasNormals())
+            normals.push_back(ai_convert(amesh->mNormals[j]));
+        if (amesh->HasTangentsAndBitangents())
+            tangents.push_back(ai_convert(amesh->mTangents[j]));
+        if (amesh->HasTextureCoords(0))
+        {
+            float3 texcoord = ai_convert(amesh->mTextureCoords[0][j]);
+            texcoords.push_back({ texcoord.x, texcoord.y });
+        }
+    }
+    for (int j = 0; j < amesh->mNumFaces; j++)
+    {
+        aiFace face = amesh->mFaces[j];
+        assert(face.mNumIndices == 3);
+        indices.push_back({ face.mIndices[0], face.mIndices[1], face.mIndices[2] });
+    }
+    string name = ai_convert(amesh->mName);
+
+    return make_shared<TriangleMesh>(name, vertices, indices, normals, tangents, texcoords);
+}
+
+void AssimpImporter::import_scene(const string& filename, shared_ptr<Scene> _s)
+{
+    Assimp::Importer importer;
+    unsigned int flags = aiProcess_Triangulate
+        | aiProcess_GenNormals
+        | aiProcess_CalcTangentSpace
+        | aiProcess_FlipUVs;
+    ascene = importer.ReadFile(filename, flags);
+
+    if (!ascene || ascene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !ascene->mRootNode)
+    {
+        cout << "ERROR::ASSIMP::" << importer.GetErrorString() << endl;
+        exit(-1);
+    }
+
+    folder = std::filesystem::path(filename).parent_path();
+    scene = _s;
+    if (scene->root == nullptr)
+        scene->root = make_shared<SceneGraphNode>();
+
+    load_meshes();
+    traverse(ascene->mRootNode, scene->root, Transform());
+    load_animations();
 }

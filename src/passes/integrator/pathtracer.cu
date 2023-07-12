@@ -37,8 +37,8 @@ void PathTracer::render_ui()
 {
     if (ImGui::CollapsingHeader("PathTracer"))
     {
-        ImGui::InputInt("samples per pixel", &samples_per_pixel);
-        
+        ImGui::SliderInt("samples per pixel", &samples_per_pixel, 1, 8);
+
         ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.21f);
         ImGui::SliderInt("max depth", &max_depth, 1, 32);
         ImGui::SameLine();

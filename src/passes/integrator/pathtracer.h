@@ -23,20 +23,10 @@ public:
 
     virtual void set_scene(shared_ptr<Scene> _scene) override;
     virtual void render(shared_ptr<Film> film) override;
+    virtual void update() override { tracer->update_as(); }
     virtual void render_ui() override;
 
 public:
-    friend void to_json(json& j, const PathTracer& p)
-    {
-        j = json{
-            {"samples_per_pixel", p.samples_per_pixel},
-            {"max_depth", p.max_depth},
-            {"rr_depth", p.rr_depth},
-            {"use_nee", p.use_nee},
-            {"use_mis", p.use_mis}
-        };
-    }
-
     friend void from_json(const json& j, PathTracer& p)
     {
         if (j.is_null()) return;

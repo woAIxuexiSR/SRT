@@ -25,7 +25,7 @@ public:
 public:
     AreaLight() {}
 
-    __device__ LightSample sample(float2 rnd)
+    __device__ LightSample sample(float2 rnd) const
     {
         float s = rnd.x * area_sum;
         float sum = 0.0f;
@@ -63,7 +63,7 @@ public:
     }
 
     // sample proportional to area
-    __device__ float sample_pdf()
+    __device__ float sample_pdf() const 
     {
         return 1.0f / area_sum;
     }
@@ -82,7 +82,7 @@ public:
 public:
     EnvironmentLight() {}
 
-    __device__ float3 emission(float3 dir)
+    __device__ float3 emission(float3 dir) const
     {
         switch (type)
         {
@@ -115,7 +115,7 @@ public:
 public:
     Light() {}
 
-    __device__ LightSample sample(float2 rnd)
+    __device__ LightSample sample(float2 rnd) const
     {
         float s = rnd.x * weight_sum;
         float sum = 0.0f;
@@ -135,12 +135,12 @@ public:
     }
 
     // sample proportional to area * intensity
-    __device__ float sample_pdf(int idx)
+    __device__ float sample_pdf(int idx) const
     {
         return lights[idx].mesh->material->intensity / weight_sum;
     }
 
-    __device__ float3 environment_emission(float3 dir)
+    __device__ float3 environment_emission(float3 dir) const
     {
         if (env_light)
             return env_light->emission(dir);

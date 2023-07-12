@@ -73,8 +73,8 @@ void ToneMapping::render_ui()
 {
     if (ImGui::CollapsingHeader("ToneMapping"))
     {
-        ImGui::Checkbox("Enable", &enable);
-        ImGui::Combo("type", (int*)&type, "None\0Clamp\0Reinhard\0Uncharted2\0ACES\0");
+        ImGui::Checkbox("Enable##ToneMapping", &enable);
+        ImGui::Combo("type##ToneMapping", (int*)&type, "None\0Clamp\0Reinhard\0Uncharted2\0ACES\0");
         ImGui::SliderFloat("exposure", &exposure, -10.0f, 10.0f);
         ImGui::Checkbox("use gamma", &use_gamma);
     }

@@ -21,14 +21,14 @@ void OptixRayTracer::init_optix()
 {
     checkCudaErrors(cudaFree(0));
 
-    int num_devices;
-    checkCudaErrors(cudaGetDeviceCount(&num_devices));
-    if (num_devices == 0)
+    int device_num;
+    checkCudaErrors(cudaGetDeviceCount(&device_num));
+    if (device_num == 0)
     {
         cout << "ERROR::No CUDA capable devices found!" << endl;
         exit(-1);
     }
-    cout << "Found " << num_devices << " CUDA devices" << endl;
+    cout << "Found " << device_num << " CUDA devices" << endl;
 
     OPTIX_CHECK(optixInit());
     cout << "Successfully initialized optix" << endl;
@@ -213,8 +213,9 @@ void OptixRayTracer::create_pipeline(const vector<string>& ptxs)
 OptixTraversableHandle OptixRayTracer::build_as_from_input(const vector<OptixBuildInput>& inputs, GPUMemory<unsigned char>& as_buffer, bool compact, bool update)
 {
     OptixAccelBuildOptions accel_options = {};
-    accel_options.buildFlags = OPTIX_BUILD_FLAG_ALLOW_UPDATE | OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+    accel_options.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
     if (compact) accel_options.buildFlags |= OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
+    else accel_options.buildFlags |= OPTIX_BUILD_FLAG_ALLOW_UPDATE;
     accel_options.motionOptions.numKeys = 1;  // disable motion
     accel_options.operation = update ? OPTIX_BUILD_OPERATION_UPDATE : OPTIX_BUILD_OPERATION_BUILD;
 
@@ -328,7 +329,7 @@ void OptixRayTracer::build_gas()
         gas_inputs[i].triangleArray.sbtIndexOffsetSizeInBytes = 0;
         gas_inputs[i].triangleArray.sbtIndexOffsetStrideInBytes = 0;
 
-        bool compact = scene->animations.empty();
+        bool compact = !scene->has_animation();
         gas_traversable[i] = build_as_from_input({ gas_inputs[i] }, gas_buffer[i], compact, false);
     }
 }
@@ -353,7 +354,7 @@ void OptixRayTracer::build_ias()
     ias_input.instanceArray.numInstances = instance_num;
     ias_input.instanceArray.instances = (CUdeviceptr)ias_instances_buffer.data();
 
-    bool compact = scene->animations.empty();
+    bool compact = !scene->has_animation();
     ias_traversable = build_as_from_input({ ias_input }, ias_buffer, compact, false);
 }
 
@@ -442,17 +443,18 @@ OptixRayTracer::OptixRayTracer(const vector<string>& _ptxfiles, shared_ptr<Scene
 
 void OptixRayTracer::update_as()
 {
-    if(!scene->dynamic)
-        return;
+    if (!scene->has_animation()) return;
+    if (scene->is_static()) return;
 
-#ifndef SRT_HIGH_PERFORMANCE
-    if (!scene->bones.empty())
+    if (scene->has_bone())
+    {
         for (int i = 0; i < (int)scene->meshes.size(); i++)
+        {
+            if (!scene->meshes[i]->has_bone) continue;
             gas_traversable[i] = build_as_from_input({ gas_inputs[i] }, gas_buffer[i], false, true);
-#endif
-
-    int instance_num = (int)scene->instances.size();
-    for (int i = 0; i < instance_num; i++)
+        }
+    }
+    for (int i = 0; i < (int)scene->instances.size(); i++)
     {
         ias_instances[i].traversableHandle = gas_traversable[scene->instances[i]];
         memcpy(ias_instances[i].transform, &(scene->instance_transforms[i]), sizeof(float) * 12);

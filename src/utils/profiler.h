@@ -1,4 +1,4 @@
- #pragma once
+#pragma once
 
 #include "definition.h"
 #include "helper_cuda.h"

@@ -1,11 +1,5 @@
 #include "renderer.h"
 
-void Renderer::resize(int _w, int _h)
-{
-    width = _w;
-    height = _h;
-}
-
 void Renderer::load_passes(const json& config)
 {
     for (auto& c : config)
@@ -38,68 +32,68 @@ Camera::Type string_to_camera_type(const string& str)
 
 void Renderer::load_scene(const json& config)
 {
-    // load meshes
-    json model_config = config.at("model");
-    string type = model_config.at("type");
-    string path = (config_path.parent_path() / model_config.at("path").get<string>()).string();
+    // load model
+    string model_path = config.at("model");
+    model_path = (config_path.parent_path() / model_path).string();
+    string ext = model_path.substr(model_path.find_last_of(".") + 1);
 
-    // if (type == "pbrt")
-    // {
-    //     PBRTParser parser(path);
-    //     parser.parse();
-    //     set_scene(parser.scene);
-    //     width = parser.width;
-    //     height = parser.height;
-    // }
-    // else
+    scene = make_shared<Scene>();
+    if (ext == "pbrt")
     {
-        scene = make_shared<Scene>();
+        PBRTParser parser;
+        parser.parse(model_path, scene);
+        resize(parser.width, parser.height);
+    }
+    else
+    {
         AssimpImporter importer;
-        importer.import(path, scene);
+        importer.import_scene(model_path, scene);
+    }
 
-        // load camera
+    // load camera
+    auto vec_to_f3 = [](const vector<float>& v) -> float3 { return { v[0], v[1], v[2] }; };
+    if (config.find("camera") != config.end())
+    {
         json camera_config = config.at("camera");
-        shared_ptr<Camera> camera = make_shared<Camera>();
-        auto vec_to_f3 = [](const vector<float>& v) -> float3 { return { v[0], v[1], v[2] }; };
         float3 position = vec_to_f3(camera_config.at("position"));
         float3 target = vec_to_f3(camera_config.at("target"));
         float3 up = vec_to_f3(camera_config.at("up"));
+        float fov = camera_config.value("fov", 60.0f);
+        float aspect = (float)width / (float)height;
+        Camera::Type type = string_to_camera_type(camera_config.at("type"));
 
-        camera->controller = CameraController(Transform::LookAt(position, target, up), length(position - target));
-        camera->type = string_to_camera_type(camera_config.at("type"));
-        camera->aspect = (float)width / (float)height;
-        camera->fov = camera_config.value("fov", 60.0f);
-        camera->fov /= camera->aspect;
-        camera->focal = camera_config.value("focal", 1.0f);
-        camera->aperture = camera_config.value("aperture", 0.0f);
+        shared_ptr<Camera> camera = make_shared<Camera>(type, aspect, fov);
+        camera->set_controller(Transform::LookAt(position, target, up), length(position - target));
+
         camera->reset();
-
         scene->set_camera(camera);
+    }
+    else if (scene->camera == nullptr)
+    {
+        cout << "ERROR::No camera specified" << endl;
+        exit(-1);
+    }
 
-        // load environment light
-        if (config.find("environment") != config.end())
+    // load environment map
+    if (config.find("environment") != config.end())
+    {
+        json env_config = config.at("environment");
+        string env_type = env_config.at("type");
+        if (env_type == "constant")
+            scene->set_background(vec_to_f3(env_config.at("color")));
+        else if (env_type == "uvmap")
         {
-            json env_config = config.at("environment");
-            string env_type = env_config.at("type");
-            if (env_type == "constant")
-                scene->set_background(vec_to_f3(env_config.at("color")));
-            // else if (env_type == "uvmap")
-            // {
-            //     string env_path = (config_path.parent_path() / env_config.at("path").get<string>()).string();
-            //     scene->load_environment_map(vector<string>({ env_path }));
-            // }
-            // else if (env_type == "cubemap")
-            // {
-            //     vector<string> paths;
-            //     for (auto& p : env_config.at("path"))
-            //         paths.push_back((config_path.parent_path() / p.get<string>()).string());
-            //     scene->load_environment_map(paths);
-            // }
-            else
-            {
-                cout << "ERROR::Unknown environment type: " << env_type << endl;
-                exit(-1);
-            }
+            string env_path = env_config.at("path");
+            env_path = (config_path.parent_path() / env_path).string();
+            shared_ptr<Texture> texture = make_shared<Texture>();
+            texture->name = "environment";
+            texture->image.load_from_file(env_path);
+            scene->set_environment_map(texture);
+        }
+        else
+        {
+            cout << "ERROR::Unknown environment type: " << env_type << endl;
+            exit(-1);
         }
     }
 
@@ -112,19 +106,14 @@ void ImageRenderer::run()
 {
     {
         PROFILE("render");
-        // float t = 0.2f;
-        // scene->update(t);
         for (auto pass : passes)
-        {
-            // pass->update();
             pass->render(film);
-        }
-
     }
 
     {
         PROFILE("save");
-        film->save((config_path.parent_path() / filename).string());
+        Image image(width, height, film->get_pixels());
+        image.save_to_file((config_path.parent_path() / filename).string());
     }
 
     Profiler::print();
@@ -138,13 +127,14 @@ void InteractiveRenderer::load_scene(const json& config)
 
 void InteractiveRenderer::run()
 {
-    auto start = std::chrono::high_resolution_clock::now();
-    float t = 0;
+    float animt = 0.0f, t = 0.0f;
+    CpuTimer timer;
+    timer.start_timer();
     while (!gui->should_close())
     {
         gui->begin_frame();
 
-        scene->update(t);
+        scene->update(t - animt);
         scene->render_ui();
         for (auto pass : passes)
         {
@@ -157,13 +147,12 @@ void InteractiveRenderer::run()
         gui->write_texture(film->get_pixels());
         gui->end_frame();
 
-        auto end = std::chrono::high_resolution_clock::now();
-        t = std::chrono::duration<float>(end - start).count();
-        if (!scene->dynamic)
-        {
-            t = 0;
-            start = std::chrono::high_resolution_clock::now();
-        }
+        timer.end_timer();
+        float delta = timer.get_time() * 0.001f;
+        t += delta;
+        if (!scene->enable_animation)
+            animt += delta;
+        timer.start_timer();
     }
 }
 
@@ -179,8 +168,8 @@ void VideoRenderer::run()
         exit(-1);
     }
 
-    auto start = std::chrono::high_resolution_clock::now();
-    float t = 0;
+    float step = 1.0f / 30.0f;
+    float t = 0.0f;
     for (int i = 0; i < frame; i++)
     {
         scene->update(t);
@@ -189,9 +178,9 @@ void VideoRenderer::run()
             pass->update();
             pass->render(film);
         }
-        film->save("temporary_images/" + std::to_string(i) + ".png");
-        auto end = std::chrono::high_resolution_clock::now();
-        t = std::chrono::duration<float>(end - start).count() / 10;
+        Image image(width, height, film->get_pixels());
+        image.save_to_file("temporary_images/" + std::to_string(i) + ".png");
+        t += step;
     }
 
     command = "ffmpeg -y -framerate 30 -i temporary_images/%d.png ";

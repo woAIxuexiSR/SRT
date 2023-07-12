@@ -24,19 +24,6 @@ public:
     virtual void render_ui() override;
 
 public:
-    static string type_to_string(SimpleParams::Type type)
-    {
-        switch (type)
-        {
-        case SimpleParams::Type::Depth: return "Depth";
-        case SimpleParams::Type::Normal: return "Normal";
-        case SimpleParams::Type::BaseColor: return "BaseColor";
-        case SimpleParams::Type::Ambient: return "Ambient";
-        case SimpleParams::Type::FaceOrientation: return "FaceOrientation";
-        default: return "Unknown";
-        }
-    }
-
     static SimpleParams::Type string_to_type(const string& str)
     {
         if (str == "Depth") return SimpleParams::Type::Depth;
@@ -45,14 +32,6 @@ public:
         if (str == "Ambient") return SimpleParams::Type::Ambient;
         if (str == "FaceOrientation") return SimpleParams::Type::FaceOrientation;
         return SimpleParams::Type::Depth;
-    }
-
-    friend void to_json(json& j, const Simple& p)
-    {
-        j = json{
-            {"type", type_to_string(p.type)},
-            {"samples_per_pixel", p.samples_per_pixel}
-        };
     }
 
     friend void from_json(const json& j, Simple& p)

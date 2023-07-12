@@ -30,6 +30,11 @@ Diffuse parameters:
     number - 0
     names - none
 
+Diffuse Transmission parameters:
+    description - Lambertian BTDF
+    number - 0
+    names - none
+
 Dielectric parameters:
     description - thin dielectric
     number - 1
@@ -54,7 +59,7 @@ Disney parameters:
 class BxDF
 {
 public:
-    enum class Type { Diffuse, Dielectric, Disney };
+    enum class Type { Diffuse, DiffuseTransmission, Dielectric, Disney };
 
     Type type{ Type::Diffuse };
     float ior{ 1.5f };
@@ -78,6 +83,9 @@ public:
 
         case Type::Diffuse:
             return (wi.z <= 0.0f) ? make_float3(0.0f) : color * (float)M_1_PI;
+
+        case Type::DiffuseTransmission:
+            return color * (float)M_1_PI;
 
         case Type::Dielectric:
             return { 0.0f, 0.0f, 0.0f };
@@ -183,6 +191,24 @@ public:
             return { eval(wi, wo, color, inner), wi.z, wi, pdf };
         }
 
+        case Type::DiffuseTransmission:
+        {
+            if (rnd.x < 0.5f)
+            {
+                rnd.x *= 2.0f;
+                float3 wi = cosine_sample_hemisphere(rnd);
+                float pdf = cosine_hemisphere_pdf(wi.z);
+                return { eval(wi, wo, color, inner), wi.z, wi, 0.5f * pdf };
+            }
+            else
+            {
+                rnd.x = (rnd.x - 0.5f) * 2.0f;
+                float3 wi = cosine_sample_hemisphere(rnd);
+                float pdf = cosine_hemisphere_pdf(wi.z);
+                return { eval(-wi, wo, color, inner), wi.z, -wi, 0.5f * pdf };
+            }
+        }
+
         case Type::Dielectric:
         {
             float eta = inner ? ior : 1.0f / ior;
@@ -194,8 +220,8 @@ public:
             if (rnd.x <= reflect_ratio)
                 wi = reflect(-wo, n);
 
-            return { color, wi.z, wi, 1.0f };
-            // return { color * reflect_ratio, wi.z, wi, reflect_ratio };
+            return { color, abs(wi.z), wi, 1.0f };
+            // return { color * reflect_ratio, abs(wi.z), wi, reflect_ratio };
         }
 
         case Type::Disney:
@@ -257,7 +283,7 @@ public:
                     return BxDFSample();
                 L = normalize(reflect(-V, H));
             }
-            // return { eval(L, wo, color, inner), L.z, L, sample_pdf(L, wo, color, inner) };
+            // return { eval(L, wo, color, inner), abs(L.z), L, sample_pdf(L, wo, color, inner) };
 
             float pdf = 0.0f;
 
@@ -282,7 +308,7 @@ public:
             if (clearcoat_w > 0.0f && dot(V, H_reflect) > 0.0f)
                 pdf += clearcoat_w * GTR1(H_reflect.z, clearcoatGloss) * H_reflect.z / (4.0f * dot(V, H_reflect));
 
-            return { eval(L, wo, color, inner), L.z, L, pdf };
+            return { eval(L, wo, color, inner), abs(L.z), L, pdf };
         }
 
         default:
@@ -298,6 +324,9 @@ public:
 
         case Type::Diffuse:
             return (wi.z <= 0.0f) ? 0.0f : cosine_hemisphere_pdf(wi.z);
+
+        case Type::DiffuseTransmission:
+            return 0.5f * cosine_hemisphere_pdf(abs(wi.z));
 
         case Type::Dielectric:
             return 0.0f;
@@ -336,13 +365,11 @@ public:
             if (diffuse_w > 0.0f && L.z > 0.0f)
                 pdf += diffuse_w * cosine_hemisphere_pdf(L.z);
             if (spec_reflect_w > 0.0f && dot(V, H_reflect) > 0.0f)
-                // pdf += spec_reflect_w * GTR2(H_reflect.z, roughness) * H_reflect.z / (4.0f * dot(V, H_reflect));
                 pdf += spec_reflect_w * GTR2_aniso(H_reflect.z, H_reflect.x, H_reflect.y, ax, ay) * H_reflect.z / (4.0f * dot(V, H_reflect));
             if (spec_refract_w > 0.0f && dot(V, H_refract) > 0.0f && dot(L, H_refract) < 0.0f)
             {
                 float V_H = dot(V, H_refract), L_H = dot(L, H_refract);
                 float denom = (L_H + V_H * eta);
-                // pdf += spec_refract_w * GTR2(H_refract.z, roughness) * H_refract.z * abs(L_H) / (denom * denom);
                 pdf += spec_refract_w * GTR2(H_refract.z, roughness) * smithG_GGX(V.z, roughness) * max(dot(V, H_refract), 0.0f)
                     / V.z * abs(L_H) / (denom * denom);
             }

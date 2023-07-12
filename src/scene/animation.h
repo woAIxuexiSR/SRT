@@ -27,10 +27,10 @@ public:
     enum class Interpolation { Linear, Cubic };
     enum class Extrapolation { Clamp, Repeat, Mirror };
 
-    Interpolation itype { Interpolation::Linear };
-    Extrapolation etype { Extrapolation::Repeat };
+    Interpolation itype{ Interpolation::Linear };
+    Extrapolation etype{ Extrapolation::Repeat };
     string name;
-    float duration { 0.0f };    // in seconds
+    float duration{ 0.0f };    // in seconds
     vector<KeyTranslation> translations;
     vector<KeyRotation> rotations;
     vector<KeyScale> scales;
@@ -48,6 +48,6 @@ public:
     float3 interpolate_scale(float t) const;
 
     /* useful functions */
-    
+
     Transform get_transform(float t) const;
 };

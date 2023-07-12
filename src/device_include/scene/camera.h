@@ -118,7 +118,6 @@ public:
             Ray ray(make_float3(0.0f), normalize(make_float3(p, 1.0f)));
             return controller.to_world(ray);
         }
-#ifndef SRT_HIGH_PERFORMANCE
         case Type::Orthographic:            // approximate size
         {
             Ray ray(make_float3(p * controller.radius, 1.0f), make_float3(0.0f, 0.0f, 1.0f));
@@ -138,7 +137,6 @@ public:
             float3 dir = make_float3(-math_space_dir.x, math_space_dir.z, math_space_dir.y);
             return controller.to_world(Ray(make_float3(0.0f), dir));
         }
-#endif
         default:
             return Ray();
         }
@@ -158,8 +156,14 @@ public:
     {
         reset();
     }
+    Camera(Type _t, float _aspect, float _fov)
+        : controller(), type(_t), aspect(_aspect), fov(_fov), aperture(0.0f), focal(1.0f)
+    {
+        reset();
+    }
 
     void set_moved(bool _moved) { moved = _moved; }
+    void set_controller(Transform t, float r) { controller = CameraController(t, r); }
 
     void reset()
     {

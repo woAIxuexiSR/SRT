@@ -39,6 +39,7 @@ float3 Animation::interpolate_translation(float t) const
         if (t <= translations[idx + 1].time_stamp)
             break;
     }
+    if (idx == translations.size() - 1) return translations[idx].translation;
     float factor = (t - translations[idx].time_stamp) / (translations[idx + 1].time_stamp - translations[idx].time_stamp);
     return interpolate_float3(translations[idx].translation, translations[idx + 1].translation, factor);
 }
@@ -54,6 +55,7 @@ Quaternion Animation::interpolate_rotation(float t) const
         if (t <= rotations[idx + 1].time_stamp)
             break;
     }
+    if (idx == rotations.size() - 1) return rotations[idx].rotation;
     float factor = (t - rotations[idx].time_stamp) / (rotations[idx + 1].time_stamp - rotations[idx].time_stamp);
     return Quaternion::Slerp(rotations[idx].rotation, rotations[idx + 1].rotation, factor);
 }
@@ -69,6 +71,7 @@ float3 Animation::interpolate_scale(float t) const
         if (t < scales[idx + 1].time_stamp)
             break;
     }
+    if (idx == scales.size() - 1) return scales[idx].scale;
     float factor = (t - scales[idx].time_stamp) / (scales[idx + 1].time_stamp - scales[idx].time_stamp);
     return interpolate_float3(scales[idx].scale, scales[idx + 1].scale, factor);
 }

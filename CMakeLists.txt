@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(SuperRay LANGUAGES C CXX CUDA)
+project(SRT LANGUAGES C CXX CUDA)
 
 # select cuda architectures
 include(FindCUDA/select_compute_arch)
@@ -153,7 +153,6 @@ endif()
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>)
 # add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
-# add_compile_definitions(SRT_HIGH_PERFORMANCE)
 
 list(APPEND PROJECT_INCLUDE 
     ${GLAD_INCLUDE}

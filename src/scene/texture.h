@@ -1,6 +1,7 @@
 #pragma once
 
 #include "definition.h"
+#include "helper_cuda.h"
 #include "my_math.h"
 
 class Image
@@ -15,11 +16,13 @@ public:
 
 public:
     Image() : format(Format::Uchar), resolution({ 0, 0 }) {}
+    Image(int _w, int _h, float4* data);    // build from gpu data
 
     /* helper functions */
 
     void f_to_u();
     void u_to_f();
+    void flip(bool x, bool y);
     void save_exr(const string& filename);
     void save_hdr(const string& filename);
     void save_ldr(const string& filename);

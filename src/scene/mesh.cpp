@@ -8,8 +8,6 @@ void TriangleMesh::compute_aabb()
         aabb.expand(v);
 }
 
-#ifndef SRT_HIGH_PERFORMANCE
-
 void TriangleMesh::reset_bones()
 {
     has_bone = true;
@@ -32,5 +30,3 @@ void TriangleMesh::add_bone_influence(int vid, int bid, float weight)
     }
     cout << "ERROR::Too many bone influences for vertex " << vid << endl;
 }
-
-#endif

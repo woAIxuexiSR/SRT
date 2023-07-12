@@ -24,36 +24,10 @@ extern "C" __global__ void __closesthit__radiance()
 
     const GTriangleMesh* mesh = sbtData.mesh;
     const Transform* transform = sbtData.transform;
-
-    const uint3& index = mesh->indices[prim_idx];
-    const float3& v0 = mesh->vertices[index.x];
-    const float3& v1 = mesh->vertices[index.y];
-    const float3& v2 = mesh->vertices[index.z];
-
-    float3 pos = v0 * (1.0f - uv.x - uv.y) + v1 * uv.x + v2 * uv.y;
-    float3 normal;
-    if (mesh->normals)
-        normal = normalize(mesh->normals[index.x] * (1.0f - uv.x - uv.y) + mesh->normals[index.y] * uv.x + mesh->normals[index.z] * uv.y);
-    else
-        normal = normalize(cross(v1 - v0, v2 - v0));
-    float2 texcoord = uv;
-    if (mesh->texcoords)
-        texcoord = mesh->texcoords[index.x] * (1.0f - uv.x - uv.y) + mesh->texcoords[index.y] * uv.x + mesh->texcoords[index.z] * uv.y;
-
-    float3 shading_normal = mesh->material->shading_normal(normal, texcoord);
-    float3 tangent = (abs(shading_normal.x) > abs(shading_normal.y)) ? make_float3(0.0f, 1.0f, 0.0f) : make_float3(1.0f, 0.0f, 0.0f);
-    if (mesh->tangents)
-        tangent = normalize(mesh->tangents[index.x] * (1.0f - uv.x - uv.y) + mesh->tangents[index.y] * uv.x + mesh->tangents[index.z] * uv.y);
+    const int light_id = sbtData.light_id;
 
     HitInfo& prd = *(HitInfo*)getPRD<HitInfo>();
-    prd.hit = true;
-    prd.pos = transform->apply_point(pos);
-    prd.normal = transform->apply_vector(normal);
-    prd.texcoord = texcoord;
-    prd.onb = Onb(transform->apply_vector(shading_normal), transform->apply_vector(tangent));
-    prd.color = mesh->material->surface_color(texcoord);
-    prd.mat = mesh->material;
-    prd.light_id = sbtData.light_id;
+    get_hitinfo(prd, mesh, transform, prim_idx, uv, ray_dir, light_id);
 }
 
 extern "C" __global__ void __closesthit__shadow()
@@ -78,12 +52,11 @@ extern "C" __global__ void __raygen__()
 {
     const uint3 launch_idx = optixGetLaunchIndex();
     const int idx = launch_idx.x;
-
     const int ix = idx % params.width, iy = idx / params.width;
 
     RandomGenerator rng(params.seed + idx, 0);
-    Camera& camera = params.camera;
-    Light* light = params.light;
+    const Camera& camera = params.camera;
+    const Light* light = params.light;
 
     HitInfo info; int visible;
     uint2 u = pack_pointer(&info), v = pack_pointer(&visible);
@@ -95,9 +68,9 @@ extern "C" __global__ void __raygen__()
         float yy = (iy + rng.random_float()) / params.height;
         Ray ray = camera.get_ray(xx, yy, rng);
 
-        float3 L = make_float3(0.0f), beta = make_float3(1.0f);
         bool specular = true;
         float scatter_pdf = 1.0f;
+        float3 L = make_float3(0.0f), beta = make_float3(1.0f);
         for (int depth = 0; depth < params.max_depth; depth++)
         {
             optixTrace(params.traversable, ray.pos, ray.dir, 1e-3f, 1e16f, 0.0f,
@@ -115,8 +88,8 @@ extern "C" __global__ void __raygen__()
             // hit light
             if (info.hit && info.mat->is_emissive())
             {
-                if (dot(info.normal, ray.dir) > 0.0f)
-                    break;
+                float cos_i = dot(info.normal, -ray.dir);
+                if (cos_i < 0.0f) break;
 
                 float mis_weight = 1.0f;
                 if (params.use_nee && !specular)
@@ -125,7 +98,7 @@ extern "C" __global__ void __raygen__()
                     if (params.use_mis)
                     {
                         float t2 = dot(info.pos - ray.pos, info.pos - ray.pos);
-                        float light_pdf = light->sample_pdf(info.light_id) * t2 / dot(info.normal, -ray.dir);
+                        float light_pdf = light->sample_pdf(info.light_id) * t2 / cos_i;
                         mis_weight = scatter_pdf / (light_pdf + scatter_pdf);
                     }
                 }
@@ -139,9 +112,11 @@ extern "C" __global__ void __raygen__()
                 LightSample ls = light->sample(rng.random_float2());
                 Ray shadow_ray(info.pos, normalize(ls.pos - info.pos));
 
-                float cos_i = dot(info.normal, shadow_ray.dir);
+                float cos_i = dot(info.normal, -ray.dir);
+                if (cos_i < 0.0f) info.normal = -info.normal;
+                float cos_o = dot(info.normal, shadow_ray.dir);
                 float cos_light = dot(ls.normal, -shadow_ray.dir);
-                if ((cos_light > 0.0f) && (cos_i > 0.0f || info.mat->is_transmissive()))
+                if ((cos_light > 0.0f) && (cos_o > 0.0f || info.mat->is_transmissive()))
                 {
                     float t = length(ls.pos - info.pos);
                     optixTrace(params.traversable, shadow_ray.pos, shadow_ray.dir, 1e-3f, t - 1e-3f, 0.0f,
@@ -159,7 +134,7 @@ extern "C" __global__ void __raygen__()
                             mis_weight = light_pdf / (light_pdf + mat_pdf);
                         }
                         L += beta * info.mat->eval(shadow_ray.dir, -ray.dir, info.onb, info.color)
-                            * abs(cos_i) * ls.emission * mis_weight / light_pdf;
+                            * abs(cos_o) * ls.emission * mis_weight / light_pdf;
                     }
                 }
             }
@@ -167,7 +142,7 @@ extern "C" __global__ void __raygen__()
             // sample next direction
             BxDFSample ms = info.mat->sample(-ray.dir, rng.random_float2(), info.onb, info.color);
             if (ms.pdf <= 1e-5f) break;
-            beta *= ms.f * abs(dot(ms.wi, info.normal)) / ms.pdf;
+            beta *= ms.f * ms.cos_theta / ms.pdf;
 
             specular = info.mat->is_specular();
             ray = Ray(info.pos, ms.wi);

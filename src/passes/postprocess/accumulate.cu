@@ -15,14 +15,8 @@ void Accumulate::render(shared_ptr<Film> film)
         frame_count = 0;
         return;
     }
-    if(!enable)
-    {
-        frame_count = 0;
-        return;
-    }
-
     PROFILE("Accumulate");
-    
+
     float4* pixels = film->get_pixels();
     float4* acc = accumulated.data();
     int cnt = frame_count;
@@ -37,9 +31,9 @@ void Accumulate::render(shared_ptr<Film> film)
 
 void Accumulate::render_ui()
 {
-    if(ImGui::CollapsingHeader("Accumulate"))
+    if (ImGui::CollapsingHeader("Accumulate"))
     {
-        ImGui::Checkbox("Enable", &enable);
+        ImGui::Checkbox("Enable##Accumulate", &enable);
         ImGui::Text("Accumulated Frame Count: %d", frame_count);
     }
 }

@@ -19,6 +19,5 @@ public:
     virtual void render_ui() override;
 
 public:
-    friend void to_json(json& j, const Accumulate& p) {}
     friend void from_json(const json& j, Accumulate& p) {}
 };

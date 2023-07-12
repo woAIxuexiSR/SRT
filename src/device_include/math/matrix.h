@@ -220,10 +220,10 @@ __host__ __device__ inline SquareMatrix<2> Inverse(const SquareMatrix<2>& m)
 
     float invDet = 1.0f / det;
     SquareMatrix<2> inv;
-    inv[0][0] = m[1][1] * invDet;
+    inv[0][0] =  m[1][1] * invDet;
     inv[0][1] = -m[0][1] * invDet;
     inv[1][0] = -m[1][0] * invDet;
-    inv[1][1] = m[0][0] * invDet;
+    inv[1][1] =  m[0][0] * invDet;
 
     return inv;
 }

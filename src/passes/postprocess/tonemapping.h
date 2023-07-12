@@ -22,19 +22,6 @@ public:
     virtual void render_ui() override;
 
 public:
-    static string type_to_string(Type type)
-    {
-        switch (type)
-        {
-        case Type::None: return "None";
-        case Type::Clamp: return "Clamp";
-        case Type::Reinhard: return "Reinhard";
-        case Type::Uncharted2: return "Uncharted2";
-        case Type::ACES: return "ACES";
-        default: return "Unknown";
-        }
-    }
-
     static Type string_to_type(const string& str)
     {
         if (str == "None") return Type::None;
@@ -43,15 +30,6 @@ public:
         if (str == "Uncharted2") return Type::Uncharted2;
         if (str == "ACES") return Type::ACES;
         return Type::None;
-    }
-
-    friend void to_json(json& j, const ToneMapping& p)
-    {
-        j = json{
-            { "type", ToneMapping::type_to_string(p.type) },
-            { "exposure", p.exposure },
-            { "use_gamma", p.use_gamma }
-        };
     }
 
     friend void from_json(const json& j, ToneMapping& p)

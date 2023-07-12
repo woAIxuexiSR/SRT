@@ -10,8 +10,8 @@
 /* basic math */
 
 #define EPSILON 1e-6f
-#define FLOAT_MAX 3.402823466e+38F
-#define FLOAT_MIN -3.402823466e+38F
+#define FLOAT_MAX 3.402823466e+38f
+#define FLOAT_MIN -3.402823466e+38f
 
 __host__ __device__ inline float Radians(float deg)
 {

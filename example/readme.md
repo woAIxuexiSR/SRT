@@ -1,10 +1,10 @@
-# SuperRay Scene Configuration File
+# SRT Scene Configuration File
 
-Welcome to the readme for the scene configuration file of SuperRay! This document serves as your comprehensive guide to understanding the structure and available options within the scene configuration file. By following this guide, you will gain the necessary knowledge to effectively build and utilize SuperRay for your ray tracing needs.
+Welcome to the readme for the scene configuration file of SRT! This document serves as your comprehensive guide to understanding the structure and available options within the scene configuration file. By following this guide, you will gain the necessary knowledge to effectively build and utilize SRT for your ray tracing needs.
 
 ## 1. File Structure
 
-The SuperRay scene configuration file is structured as a JSON document. It allows you to specify all the necessary rendering parameters.
+The SRT scene configuration file is structured as a JSON document. It allows you to specify all the necessary rendering parameters.
 
 The file consists of three sections: "render," "passes," and "scene." The "render" section serves to define the core parameters of the renderer. The "passes" section is dedicated to defining the render passes to be employed. Lastly, the "scene" section encompasses all the scene properties.
 
@@ -14,9 +14,9 @@ The file consists of three sections: "render," "passes," and "scene." The "rende
 
 - **output** : The output file name. Note that this option will be ignored if the render type is set to "interactive".
 
-- **resolution** : The resolution of the output image. It should be specified as `[width, height]`. However, if the scene file is in pbrt format, the resolution value will be disregarded.
+- **resolution** : The resolution of the output image. It should be specified as `[width, height]`. (This will be ignored if the model file is in pbrt format.)
 
-- **frame** : The frame number of the video. This option will be ignored if the render type is set to "image".
+- **frame** : The frame number of the video. This option only applies if the render type is set to "video".
 
 ## 3. Passes Section
 
@@ -30,13 +30,9 @@ The passes section is an array of passes, where each pass is defined as an objec
 
 ## 4. Scene Section
 
-- **model** : An object that encompasses the model properties.
+- **model** : The path to the model file. Supported file formats include pbrt, obj, and gltf etc. (For pbrt format, we only support a subset of it.)
 
-  - **type** : The type of the model. Valid values are "pbrt" (only support a subset) or any model file extensions supported by Assimp.
-
-  - **path** : The path to the model file.
-
-- **camera** : An object that contains the camera properties. Note that this section may be ignored if the file format is set to pbrt. The camera object includes the following properties:
+- **camera** : An object that contains the camera properties. If the model file is in pbrt format, this section can be not specified. The camera object includes the following properties:
 
   - **type** : The type of the camera. Valid values are "perspective," "orthographic, "thinlens", or "environment".
 
@@ -48,13 +44,13 @@ The passes section is an array of passes, where each pass is defined as an objec
 
   - Other properties: Contains additional properties specific to different camera types. For more detailed information, please refer to the [cameras source code](../src/device_include/scene/camera.h).
 
-- **environment** : An object that encompasses the environment properties. Note that this section may be ignored if the file format is set to pbrt. The environment object includes the following properties:
+- **environment** : An object that encompasses the environment properties. The environment object includes the following properties:
 
-  - **type** : The type of the environment. Valid values are "constant," "uvmap," or "cubemap".
+  - **type** : The type of the environment. Valid values are "constant" or "uvmap".
 
   - **color** : For "constant" environment type, specifies the color of the environment as a three-dimensional vector `[r, g, b]`.
 
-  - **path** : For "uvmap" environment type, specifies the path to the uvmap file. For "cubemap" environment type, specifies an array of paths to the cubemap files.
+  - **path** : For "uvmap" environment type, specifies the path to the uvmap file. 
 
 ## 5. Example Scene Configuration File
 
@@ -62,7 +58,7 @@ The passes section is an array of passes, where each pass is defined as an objec
 {
     "render": {
         "type": "image",
-        "output": "output.png"
+        "output": "output.exr"
     },
     "passes": [
         {
@@ -76,10 +72,7 @@ The passes section is an array of passes, where each pass is defined as an objec
         }
     ],
     "scene": {
-        "model": {
-            "type": "pbrt",
-            "path": "cornell_box.pbrt"
-        }
+        "model": "cornell_box.pbrt"
     }
 }
 ```
