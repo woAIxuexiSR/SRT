@@ -2,6 +2,14 @@
 
 SRT(Super Rabbit Tracer) is a powerful rendering framework based on the OptiX ray tracing engine. Its goal is to provide a simple and flexible API for building ray tracing applications, making it easier for researchers to quickly prototype new ideas and discover innovative methods.
 
+**Work in progress.**
+
+## Features
+
+* [x] OptiX Ray Tracing Engine
+* [x] Disney BRDF
+* [x] Skeletal animation
+
 ## Requirements
 
 * [OptiX SDK](https://developer.nvidia.com/optix) (version 7.3 or higher)
@@ -44,7 +52,7 @@ Usage: main [options]
     --scene, -s: Override the scene config.
 ```
 
-## Features
+## Algorithms
 
 * [x] Path tracing
 * [ ] Bidirectional path tracing
