@@ -432,7 +432,11 @@ void Scene::render_ui()
                 changed |= ImGui::Combo("type##Material", (int*)&materials[i]->bxdf.type, "Diffuse\0DiffuseTransmission\0Dielectric\0Disney\0\0");
                 changed |= ImGui::ColorEdit3("base color", &materials[i]->base_color.x);
 
-                if (materials[i]->bxdf.type == BxDF::Type::Disney)
+                if(materials[i]->intensity > 0.0f)
+                {
+
+                }
+                else if (materials[i]->bxdf.type == BxDF::Type::Disney)
                 {
                     if (ImGui::TreeNode("disney parameters"))
                     {

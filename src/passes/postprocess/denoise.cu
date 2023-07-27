@@ -17,9 +17,8 @@ Denoise::Denoise() : intensity(1)
     OPTIX_CHECK(optixDeviceContextCreate(cuda_context, 0, &context));
 }
 
-void Denoise::resize(int _w, int _h)
+void Denoise::init()
 {
-    width = _w; height = _h;
     denoised.resize(width * height);
 
     OptixDenoiserOptions options = {};

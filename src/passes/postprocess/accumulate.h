@@ -14,7 +14,7 @@ private:
 public:
     Accumulate() {}
 
-    virtual void resize(int _w, int _h) override;
+    virtual void init() override;
     virtual void render(shared_ptr<Film> film) override;
     virtual void render_ui() override;
 

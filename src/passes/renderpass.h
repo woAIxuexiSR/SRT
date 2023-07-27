@@ -17,10 +17,11 @@ protected:
 public:
     RenderPass() {}
 
-    virtual void set_enable(bool _enable) { enable = _enable; }
-    virtual void resize(int _w, int _h) { width = _w; height = _h; }
-    virtual void set_scene(shared_ptr<Scene> _scene) { scene = _scene; }
+    void set_enable(bool _enable) { enable = _enable; }
+    void resize(int _w, int _h) { width = _w; height = _h; }
+    void set_scene(shared_ptr<Scene> _scene) { scene = _scene; }
 
+    virtual void init() {}
     virtual void render(shared_ptr<Film> film) = 0;
     virtual void update() {};
     virtual void render_ui() {};

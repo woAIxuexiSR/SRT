@@ -3,10 +3,12 @@
 #include "definition.h"
 
 #include "renderpass.h"
-#include "integrator/pathtracer.h"
-#include "postprocess/accumulate.h"
-#include "postprocess/tonemapping.h"
-#include "postprocess/denoise.h"
+// #include "integrator/pathtracer.h"
+// #include "npr/simple.h"
+// #include "postprocess/accumulate.h"
+// #include "postprocess/denoise.h"
+// #include "postprocess/tonemapping.h"
+// #include "wavefront/wavefront.h"
 
 #include "gui.h"
 #include "pbrtparse.h"

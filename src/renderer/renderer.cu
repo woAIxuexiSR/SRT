@@ -10,6 +10,7 @@ void Renderer::load_passes(const json& config)
         pass->set_enable(c.value("enable", true));
         pass->resize(width, height);
         pass->set_scene(scene);
+        pass->init();
 
         passes.push_back(pass);
     }

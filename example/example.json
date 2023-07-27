@@ -30,6 +30,11 @@
             "enable": true,
             "name": "Accumulate",
             "params": {}
+        },
+        {
+            "enable": true,
+            "name": "Denoise",
+            "params": {}
         }
     ],
     "scene": {

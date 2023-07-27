@@ -2,19 +2,18 @@
 
 REGISTER_RENDER_PASS_CPP(PathTracer);
 
-void PathTracer::set_scene(shared_ptr<Scene> _scene)
+void PathTracer::init()
 {
-    scene = _scene;
     params.resize(1);
 
     vector<string> ptx_files({ "path_tracer.ptx" });
-    tracer = make_shared<OptixRayTracer>(ptx_files, _scene);
+    tracer = make_shared<OptixRayTracer>(ptx_files, scene);
 }
 
 void PathTracer::render(shared_ptr<Film> film)
 {
     PROFILE("PathTracer");
-    PathTracerParams host_params;
+    static PathTracerParams host_params;
     host_params.seed = random_int(0, INT32_MAX);
     host_params.width = width;
     host_params.height = height;

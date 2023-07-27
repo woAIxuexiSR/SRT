@@ -18,7 +18,7 @@ private:
 public:
     Simple() {}
 
-    virtual void set_scene(shared_ptr<Scene> _scene) override;
+    virtual void init() override;
     virtual void render(shared_ptr<Film> film) override;
     virtual void update() override { tracer->update_as(); }
     virtual void render_ui() override;

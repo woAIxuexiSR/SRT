@@ -2,10 +2,9 @@
 
 REGISTER_RENDER_PASS_CPP(Accumulate);
 
-void Accumulate::resize(int _w, int _h)
+void Accumulate::init()
 {
-    width = _w; height = _h;
-    accumulated.resize(_w * _h);
+    accumulated.resize(width * height);
 }
 
 void Accumulate::render(shared_ptr<Film> film)

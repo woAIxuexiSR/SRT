@@ -2,13 +2,12 @@
 
 REGISTER_RENDER_PASS_CPP(Simple);
 
-void Simple::set_scene(shared_ptr<Scene> _scene)
+void Simple::init()
 {
-    scene = _scene;
     params.resize(1);
 
     vector<string> ptx_files({ "simple.ptx" });
-    tracer = make_shared<OptixRayTracer>(ptx_files, _scene);
+    tracer = make_shared<OptixRayTracer>(ptx_files, scene);
 }
 
 void Simple::render(shared_ptr<Film> film)
