@@ -323,7 +323,7 @@ shared_ptr<Texture> PBRTParser::load_texture(const string& name, const unordered
 
     shared_ptr<Texture> texture = make_shared<Texture>();
     texture->name = name;
-    texture->image.load_from_file(tex_path, true);
+    texture->image.load_from_file(tex_path, false, true);
     return texture;
 }
 

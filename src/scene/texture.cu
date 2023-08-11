@@ -167,7 +167,7 @@ void Image::save_ldr(const string& filename)
     }
 }
 
-void Image::load_from_file(const string& filename, bool flip_y)
+void Image::load_from_file(const string& filename, bool flip_x, bool flip_y)
 {
     void* data = nullptr;
     if (IsEXR(filename.c_str()) == TINYEXR_SUCCESS)
@@ -205,13 +205,13 @@ void Image::load_from_file(const string& filename, bool flip_y)
     {
         pixels_f.resize(resolution.x * resolution.y);
         memcpy(pixels_f.data(), data, resolution.x * resolution.y * sizeof(float4));
-        if(flip_y) flip(false, true);
+        flip(flip_x, flip_y);
     }
     else
     {
         pixels_u.resize(resolution.x * resolution.y);
         memcpy(pixels_u.data(), data, resolution.x * resolution.y * sizeof(uchar4));
-        if (flip_y) flip(false, true);
+        flip(flip_x, flip_y);
     }
     free(data);
 }
@@ -221,7 +221,7 @@ void Image::save_to_file(const string& filename)
     flip(true, true);
 
     string ext = filename.substr(filename.find_last_of(".") + 1);
-    if(ext == "exr")
+    if (ext == "exr")
         save_exr(filename);
     else if (ext == "hdr")
         save_hdr(filename);

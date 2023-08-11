@@ -11,6 +11,7 @@ class RenderPass
 {
 protected:
     bool enable;
+    bool online;
     int width, height;
     shared_ptr<Scene> scene = nullptr;
 
@@ -18,6 +19,7 @@ public:
     RenderPass() {}
 
     void set_enable(bool _enable) { enable = _enable; }
+    void set_online(bool _online) { online = _online; }
     void resize(int _w, int _h) { width = _w; height = _h; }
     void set_scene(shared_ptr<Scene> _scene) { scene = _scene; }
 

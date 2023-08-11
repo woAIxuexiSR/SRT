@@ -8,6 +8,7 @@ void Renderer::load_passes(const json& config)
 
         shared_ptr<RenderPass> pass = RenderPassFactory::create_pass(name, c["params"]);
         pass->set_enable(c.value("enable", true));
+        pass->set_online(online);
         pass->resize(width, height);
         pass->set_scene(scene);
         pass->init();

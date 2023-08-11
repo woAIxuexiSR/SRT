@@ -153,8 +153,11 @@ GUI::GUI(int _w, int _h, shared_ptr<Camera> _c, int n)
     glfwSetCursorPosCallback(window, cursor_pos_callback);
 
     auto scroll_callback = [](GLFWwindow* window, double x, double y) {
-        WindowUserData* ud = (WindowUserData*)glfwGetWindowUserPointer(window);
-        ud->camera->process_scroll_input(static_cast<float>(y));
+        if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+        {
+            WindowUserData* ud = (WindowUserData*)glfwGetWindowUserPointer(window);
+            ud->camera->process_scroll_input(static_cast<float>(y));
+        }
         };
     glfwSetScrollCallback(window, scroll_callback);
 

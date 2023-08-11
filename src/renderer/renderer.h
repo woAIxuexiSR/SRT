@@ -8,6 +8,7 @@
 #include "npr/simple.h"
 #include "postprocess/accumulate.h"
 #include "postprocess/denoise.h"
+#include "postprocess/measure.h"
 #include "postprocess/tonemapping.h"
 #include "wavefront/wavefront.h"
 
@@ -20,6 +21,7 @@ class Renderer
 {
 protected:
     std::filesystem::path config_path;
+    bool online;        // indicate whether the renderer is running online
 
     int width, height;
     shared_ptr<Scene> scene;
@@ -27,7 +29,7 @@ protected:
     vector<shared_ptr<RenderPass> > passes;
 
 public:
-    Renderer(const string& _config_path) : config_path(_config_path) {}
+    Renderer(const string& _config_path, bool _online) : config_path(_config_path), online(_online) {}
     ~Renderer() { Profiler::reset(); }
     void set_scene(shared_ptr<Scene> _scene) { scene = _scene; }
     void resize(int _w, int _h) { width = _w, height = _h; }
@@ -45,7 +47,7 @@ private:
 
 public:
     ImageRenderer(const string& _config_path, const string& _filename)
-        : Renderer(_config_path), filename(_filename) {}
+        : Renderer(_config_path, false), filename(_filename) {}
 
     virtual void run() override;
 };
@@ -58,7 +60,7 @@ private:
 
 public:
     InteractiveRenderer(const string& _config_path)
-        : Renderer(_config_path) {}
+        : Renderer(_config_path, true) {}
 
     virtual void load_scene(const json& config) override;
     virtual void run() override;
@@ -72,7 +74,7 @@ private:
 
 public:
     VideoRenderer(const string& _config_path, const string& _filename, int _f)
-        : Renderer(_config_path), filename(_filename), frame(_f) {}
+        : Renderer(_config_path, false), filename(_filename), frame(_f) {}
 
     virtual void run() override;
 };
