@@ -211,6 +211,24 @@ shared_ptr<TriangleMesh> PBRTParser::load_shape(const string& type, const unorde
     return mesh;
 }
 
+float get_roughness(const unordered_map<string, string>& params, float def)
+{
+    float roughness = def;
+    auto it = params.find("float roughness");
+    if (it != params.end())
+        roughness = std::stof(it->second);
+    else
+    {
+        float u = 0.001f, v = 0.001f;
+        it = params.find("float uroughness");
+        if (it != params.end()) u = std::stof(it->second);
+        it = params.find("float vroughness");
+        if (it != params.end()) v = std::stof(it->second);
+        roughness = (u + v) * 0.5f;
+    }
+    return roughness;
+}
+
 shared_ptr<Material> PBRTParser::load_material(const string& name, const string& type, const unordered_map<string, string>& params)
 {
     BxDF::Type bxdf_type = BxDF::Type::Disney;
@@ -246,15 +264,14 @@ shared_ptr<Material> PBRTParser::load_material(const string& name, const string&
         bxdf_type = BxDF::Type::Diffuse;
     else if (type == "coateddiffuse")
     {
-        roughness = 0.001f;
-        clearcoat = 1.0f;
+        roughness = get_roughness(params, 0.001f);
+        clearcoat = 0.8f;
         clearcoatGloss = 1.0f;
     }
     else if (type == "conductor")
     {
         metallic = 1.0f;
-        roughness = 0.001f;
-        specularTint = 1.0f;
+        roughness = get_roughness(params, 0.001f);
         base_color = make_float3(1.0f);
     }
     else if (type == "dielectric")
@@ -263,7 +280,7 @@ shared_ptr<Material> PBRTParser::load_material(const string& name, const string&
         base_color = make_float3(1.0f);
         it = params.find("float eta");
         if (it != params.end())
-            ior = std::stoi(it->second);
+            ior = std::stof(it->second);
     }
     else if (type == "diffusetransmission")
         bxdf_type = BxDF::Type::DiffuseTransmission;
@@ -306,7 +323,7 @@ shared_ptr<Texture> PBRTParser::load_texture(const string& name, const unordered
 
     shared_ptr<Texture> texture = make_shared<Texture>();
     texture->name = name;
-    texture->image.load_from_file(tex_path);
+    texture->image.load_from_file(tex_path, true);
     return texture;
 }
 
@@ -379,6 +396,13 @@ void PBRTParser::parse_world()
             if (in_attribute) attribute_state.transform = Transform(Transpose(mat));
             else global_state.transform = Transform(Transpose(mat));
         }
+        else if (token == "MakeNamedMedium")
+            ignore();
+        else if (token == "MediumInterface")    // ignore
+        {
+            string name = next_quoted();
+            next_quoted();
+        }
         else if (token == "MakeNamedMaterial")
         {
             string name = next_quoted();
@@ -445,18 +469,20 @@ void PBRTParser::parse_world()
         }
         else if (token == "AttributeEnd")
         {
-            assert(attribute_state.material_id != -1);
-            int mid = attribute_state.material_id;
-            float3 emission = attribute_state.emission;
-            if (dot(emission, emission) > 0.0f)
+            if (attribute_state.material_id != -1)      // otherwise it's a medium
             {
-                float intensity = length(emission);
-                emission /= intensity;
-                scene->materials[mid]->intensity = intensity;
-                scene->materials[mid]->emission_color = emission;
+                int mid = attribute_state.material_id;
+                float3 emission = attribute_state.emission;
+                if (dot(emission, emission) > 0.0f)
+                {
+                    float intensity = length(emission);
+                    emission /= intensity;
+                    scene->materials[mid]->intensity = intensity;
+                    scene->materials[mid]->emission_color = emission;
+                }
+                attribute_state.mesh->material_id = mid;
+                scene->add_instance(attribute_state.transform, attribute_state.mesh);
             }
-            attribute_state.mesh->material_id = mid;
-            scene->add_instance(attribute_state.transform, attribute_state.mesh);
             in_attribute = false;
         }
         else

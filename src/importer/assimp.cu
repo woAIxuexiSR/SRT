@@ -180,7 +180,9 @@ int AssimpImporter::load_texture(aiMaterial* amat, aiTextureType type)
         return it->second;
 
     shared_ptr<Texture> texture = make_shared<Texture>();
-    string filename = (folder / texname.C_Str()).string();
+    string texname_str = texname.C_Str();
+    std::replace(texname_str.begin(), texname_str.end(), '\\', '/');
+    string filename = (folder / texname_str).string();
     texture->image.load_from_file(filename);
     int texture_id = scene->add_texture(texture);
     texture_index_map[ai_convert(texname)] = texture_id;

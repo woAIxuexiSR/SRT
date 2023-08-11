@@ -20,7 +20,7 @@ shared_ptr<Renderer> create_renderer(const string& path, const json& config)
 {
     string type = config.at("type");
     string output = config.value("output", "");
-    vector<int> resolution = config.value("resolution", vector<int>({ 1920, 1080 }));
+    vector<int> resolution = config.value("resolution", vector<int>({ 0, 0 }));
     int frame = config.value("frame", 0);
 
     shared_ptr<Renderer> renderer;

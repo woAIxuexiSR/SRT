@@ -43,13 +43,21 @@ void Renderer::load_scene(const json& config)
     {
         PBRTParser parser;
         parser.parse(model_path, scene);
-        resize(parser.width, parser.height);
+        if (width == 0 || height == 0)
+            resize(parser.width, parser.height);
+        else
+        {
+            scene->camera->aspect = (float)width / (float)height;
+            scene->camera->reset();
+        }
     }
     else
     {
         AssimpImporter importer;
         importer.import_scene(model_path, scene);
     }
+    if (width == 0 || height == 0)
+        resize(1920, 1080);         // default resolution
 
     // load camera
     auto vec_to_f3 = [](const vector<float>& v) -> float3 { return { v[0], v[1], v[2] }; };

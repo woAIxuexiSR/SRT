@@ -1,4 +1,4 @@
-#include "pathtracer.h"
+#include "path_tracer.h"
 
 REGISTER_RENDER_PASS_CPP(PathTracer);
 

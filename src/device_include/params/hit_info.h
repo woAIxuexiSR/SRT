@@ -19,6 +19,11 @@ public:
     int light_id;
 };
 
+__device__ inline bool check_valid(float p)
+{
+    return !isnan(p) && !isinf(p);
+}
+
 __device__ inline void get_hitinfo(HitInfo& info, const GTriangleMesh* mesh, const Transform* T,
     const int prim_idx, const float2 uv, const float3 ray_dir, const int light_id)
 {

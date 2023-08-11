@@ -219,9 +219,10 @@ public:
 
             if (rnd.x <= reflect_ratio)
                 wi = reflect(-wo, n);
+            wi = normalize(wi);
 
-            return { color, abs(wi.z), wi, 1.0f };
-            // return { color * reflect_ratio, abs(wi.z), wi, reflect_ratio };
+            return { color, 1.0f, wi, 1.0f };       // f * cos / pdf = color
+            // return { color * reflect_ratio, 1.0f, wi, reflect_ratio };
         }
 
         case Type::Disney:

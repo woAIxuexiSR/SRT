@@ -31,12 +31,9 @@ public:
         return Ray(p, d);
     }
 
-    __device__ Ray to_local(Ray ray) const
+    __device__ float3 to_local(float3 dir) const
     {
-        float3 p = ray.pos - pos;
-        p = make_float3(dot(p, x), dot(p, y), dot(p, z));
-        float3 d = make_float3(dot(ray.dir, x), dot(ray.dir, y), dot(ray.dir, z));
-        return Ray(p, d);
+        return make_float3(dot(dir, x), dot(dir, y), dot(dir, z));
     }
 
     /* host functions */
@@ -143,10 +140,10 @@ public:
     }
 
     // only support perspective, the ray must pass through the camera center in reverse direction
-    __device__ float2 get_xy(Ray ray) const
+    __device__ float2 get_xy(float3 dir) const
     {
-        ray = controller.to_local(ray);
-        float2 p = make_float2(ray.dir.x, ray.dir.y) / ray.dir.z;
+        dir = controller.to_local(-dir);
+        float2 p = make_float2(dir.x, dir.y) / dir.z;
         return make_float2(p.x / nw + 0.5f, p.y / nh + 0.5f);
     }
 

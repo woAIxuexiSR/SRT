@@ -20,14 +20,6 @@
         },
         {
             "enable": true,
-            "name": "ToneMapping",
-            "params": {
-                "type": "ACES",
-                "use_gamma": true
-            }
-        },
-        {
-            "enable": true,
             "name": "Accumulate",
             "params": {}
         },
@@ -35,6 +27,14 @@
             "enable": true,
             "name": "Denoise",
             "params": {}
+        },
+        {
+            "enable": true,
+            "name": "ToneMapping",
+            "params": {
+                "type": "ACES",
+                "use_gamma": true
+            }
         }
     ],
     "scene": {

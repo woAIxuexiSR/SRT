@@ -29,7 +29,7 @@ public:
 
     /* useful functions */
 
-    void load_from_file(const string& filename);
+    void load_from_file(const string& filename, bool flip_y = false);
     void save_to_file(const string& filename);
     void* get_pixels();
 };

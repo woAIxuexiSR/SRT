@@ -14,7 +14,7 @@ The file consists of three sections: "render," "passes," and "scene." The "rende
 
 - **output** : The output file name. Note that this option will be ignored if the render type is set to "interactive".
 
-- **resolution** : The resolution of the output image. It should be specified as `[width, height]`. (This will be ignored if the model file is in pbrt format.)
+- **resolution** : The resolution of the output image. It should be specified as `[width, height]`. (If not specified, the value will be set by pbrt or '[1920, 1080]' by default.)
 
 - **frame** : The frame number of the video. This option only applies if the render type is set to "video".
 

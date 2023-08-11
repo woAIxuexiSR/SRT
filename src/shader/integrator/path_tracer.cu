@@ -89,7 +89,7 @@ extern "C" __global__ void __raygen__()
             if (info.hit && info.mat->is_emissive())
             {
                 float cos_i = dot(info.normal, -ray.dir);
-                if (cos_i < 0.0f) break;
+                if (cos_i <= 1e-4f) break;
 
                 float mis_weight = 1.0f;
                 if (params.use_nee && !specular)
@@ -114,11 +114,13 @@ extern "C" __global__ void __raygen__()
 
                 float cos_i = dot(info.normal, -ray.dir);
                 if (cos_i < 0.0f) info.normal = -info.normal;
+
                 float cos_o = dot(info.normal, shadow_ray.dir);
                 float cos_light = dot(ls.normal, -shadow_ray.dir);
-                if ((cos_light > 0.0f) && (cos_o > 0.0f || info.mat->is_transmissive()))
+                float t = length(ls.pos - info.pos);
+                if ((cos_light > 1e-4f) && (ls.pdf > 1e-4f) && (t > 1e-3f)
+                    && (cos_o > 0.0f || info.mat->is_transmissive()))
                 {
-                    float t = length(ls.pos - info.pos);
                     optixTrace(params.traversable, shadow_ray.pos, shadow_ray.dir, 1e-3f, t - 1e-3f, 0.0f,
                         OptixVisibilityMask(255), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
                         SHADOW_RAY_TYPE, RAY_TYPE_COUNT, SHADOW_RAY_TYPE,
@@ -141,7 +143,7 @@ extern "C" __global__ void __raygen__()
 
             // sample next direction
             BxDFSample ms = info.mat->sample(-ray.dir, rng.random_float2(), info.onb, info.color);
-            if (ms.pdf <= 1e-5f) break;
+            if (ms.pdf <= 1e-4f) break;
             beta *= ms.f * ms.cos_theta / ms.pdf;
 
             specular = info.mat->is_specular();
@@ -151,13 +153,14 @@ extern "C" __global__ void __raygen__()
             // russian roulette
             if (depth >= params.rr_depth)
             {
-                float p = max(beta.x, max(beta.y, beta.z));
+                float p = max(max(beta.x, max(beta.y, beta.z)), 0.05f);
                 if (rng.random_float() > p) break;
                 beta /= p;
             }
         }
 
-        result += L / params.samples_per_pixel;
+        if (check_valid(L.x) && check_valid(L.y) && check_valid(L.z))
+            result += L / params.samples_per_pixel;
     }
 
     params.pixels[idx] = make_float4(result, 1.0f);
