@@ -156,7 +156,7 @@ void Wavefront::generate_scatter_ray(int depth)
 
         BxDFSample ms = item.mat->sample(-ray.dir, rng.random_float2(), item.onb, item.color);
         if (ms.pdf <= 1e-5f) return;
-        float3 beta = item.beta * ms.f * ms.cos_theta / ms.pdf;
+        float3 beta = item.beta * ms.f / ms.pdf;
         if (depth >= rr)
         {
             float p = max(beta.x, max(beta.y, beta.z));

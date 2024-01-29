@@ -106,14 +106,15 @@ extern "C" __global__ void __raygen__()
                 break;
             }
 
+            // flip normal
+            float cos_i = dot(info.normal, -ray.dir);
+            if (cos_i < 0.0f) info.normal = -info.normal;
+
             // next event estimation
             if (params.use_nee && !info.mat->is_specular())
             {
                 LightSample ls = light->sample(rng.random_float2());
                 Ray shadow_ray(info.pos, normalize(ls.pos - info.pos));
-
-                float cos_i = dot(info.normal, -ray.dir);
-                if (cos_i < 0.0f) info.normal = -info.normal;
 
                 float cos_o = dot(info.normal, shadow_ray.dir);
                 float cos_light = dot(ls.normal, -shadow_ray.dir);
@@ -144,7 +145,9 @@ extern "C" __global__ void __raygen__()
             // sample next direction
             BxDFSample ms = info.mat->sample(-ray.dir, rng.random_float2(), info.onb, info.color);
             if (ms.pdf <= 1e-4f) break;
-            beta *= ms.f * ms.cos_theta / ms.pdf;
+            if (dot(ms.wi, info.normal) < 0.0f && !info.mat->is_transmissive()) break;
+            beta *= ms.f / ms.pdf;
+            if (!ms.delta) beta *= abs(dot(ms.wi, info.normal));
 
             specular = info.mat->is_specular();
             ray = Ray(info.pos, ms.wi);

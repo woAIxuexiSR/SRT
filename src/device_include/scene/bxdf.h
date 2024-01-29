@@ -19,9 +19,9 @@ class BxDFSample
 {
 public:
     float3 f;               // BxDF value
-    float cos_theta;        // cos(theta) of wi
     float3 wi;              // sampled direction
     float pdf{ 0.0f };      // pdf of wi
+    bool delta{ false };    // whether the BxDF is delta distribution
 };
 
 /*
@@ -188,7 +188,7 @@ public:
         {
             float3 wi = cosine_sample_hemisphere(rnd);
             float pdf = cosine_hemisphere_pdf(wi.z);
-            return { eval(wi, wo, color, inner), wi.z, wi, pdf };
+            return { eval(wi, wo, color, inner), wi, pdf, false };
         }
 
         case Type::DiffuseTransmission:
@@ -198,14 +198,14 @@ public:
                 rnd.x *= 2.0f;
                 float3 wi = cosine_sample_hemisphere(rnd);
                 float pdf = cosine_hemisphere_pdf(wi.z);
-                return { eval(wi, wo, color, inner), wi.z, wi, 0.5f * pdf };
+                return { eval(wi, wo, color, inner), wi, 0.5f * pdf, false };
             }
             else
             {
                 rnd.x = (rnd.x - 0.5f) * 2.0f;
                 float3 wi = cosine_sample_hemisphere(rnd);
                 float pdf = cosine_hemisphere_pdf(wi.z);
-                return { eval(-wi, wo, color, inner), wi.z, -wi, 0.5f * pdf };
+                return { eval(-wi, wo, color, inner), -wi, 0.5f * pdf, false };
             }
         }
 
@@ -221,8 +221,8 @@ public:
                 wi = reflect(-wo, n);
             wi = normalize(wi);
 
-            return { color, 1.0f, wi, 1.0f };       // f * cos / pdf = color
-            // return { color * reflect_ratio, 1.0f, wi, reflect_ratio };
+            return { color, wi, 1.0f, true };       // f * cos / pdf = color
+            // return { color * reflect_ratio, wi, reflect_ratio };
         }
 
         case Type::Disney:
@@ -309,7 +309,7 @@ public:
             if (clearcoat_w > 0.0f && dot(V, H_reflect) > 0.0f)
                 pdf += clearcoat_w * GTR1(H_reflect.z, clearcoatGloss) * H_reflect.z / (4.0f * dot(V, H_reflect));
 
-            return { eval(L, wo, color, inner), abs(L.z), L, pdf };
+            return { eval(L, wo, color, inner), L, pdf, false };
         }
 
         default:

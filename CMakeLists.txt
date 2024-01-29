@@ -149,6 +149,7 @@ if(MSVC)
 else()
   set(PTX_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin/ptx")
 endif()
+add_definitions(-DPTX_FOLDER=\"${PTX_OUTPUT_PATH}\")
 
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>)

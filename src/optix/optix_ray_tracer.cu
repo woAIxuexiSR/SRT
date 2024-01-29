@@ -419,7 +419,7 @@ OptixRayTracer::OptixRayTracer(const vector<string>& _ptxfiles, shared_ptr<Scene
     create_context();
 
     cout << "Creating optix pipeline..." << endl;
-    std::filesystem::path ptx_folder("ptx");
+    std::filesystem::path ptx_folder(PTX_FOLDER);
     vector<string> ptxs;
     for (const auto& ptxfile : _ptxfiles)
     {
