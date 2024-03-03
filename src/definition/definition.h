@@ -21,6 +21,7 @@ using json = nlohmann::json;
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+#include "tiny-cuda-nn/common.h"
 #include "tiny-cuda-nn/gpu_memory.h"
 #include "tiny-cuda-nn/gpu_matrix.h"
 using tcnn::GPUMemory, tcnn::GPUMatrix;

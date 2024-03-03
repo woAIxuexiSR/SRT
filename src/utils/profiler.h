@@ -2,6 +2,7 @@
 
 #include "definition.h"
 #include "helper_cuda.h"
+#include <iomanip>
 
 
 class CpuTimer
@@ -67,11 +68,17 @@ public:
 
     void end_event()
     {
-        cpu_timer->end_timer();
         gpu_timer->end_timer();
-        cpu_time += cpu_timer->get_time();
+        cpu_timer->end_timer();
         gpu_time += gpu_timer->get_time();
+        cpu_time += cpu_timer->get_time();
         count++;
+    }
+
+    void clear_time()
+    {
+        cpu_time = 0;
+        gpu_time = 0;
     }
 };
 
@@ -150,17 +157,23 @@ public:
     {
         auto& profiler = get_profiler();
         cout << "Profiler result:" << endl;
+        cout << "|         Name         |   Count   |   CPU Time (ms)   |   GPU Time (ms)   |" << endl;
+        cout << std::setprecision(4);
         for (auto& r : profiler.recorder)
         {
             string name = r.name.substr(r.name.find_last_of("/") + 1);
             int level = std::count(r.name.begin(), r.name.end(), '/') - 1;
             string indent = "";
             for (int i = 0; i < level; i++) indent += "  ";
+            string padding = "";
+            for (int i = 0; i < 20 - name.size() - level * 2; i++) padding += " ";
 
-            cout << indent << name << ": " << r.count << " times, ";
-            cout << "cpu time: " << r.cpu_time << " ms, ";
-            cout << "gpu time: " << r.gpu_time << " ms" << endl;
+            cout << "| " << indent << name << padding << " | ";
+            cout << std::setw(7) << r.count << "   | ";
+            cout << std::setw(15) << r.cpu_time << "   | ";
+            cout << std::setw(15) << r.gpu_time << "   |" << endl;
         }
+        cout << std::setprecision(cout.precision()) << std::defaultfloat;
     }
 
     static void render_ui()
@@ -168,18 +181,38 @@ public:
         auto& profiler = get_profiler();
         if (ImGui::TreeNode("Profiler"))
         {
+            float total_cpu_time = 0.f;
+            for (auto& r : profiler.recorder)
+            {
+                int level = std::count(r.name.begin(), r.name.end(), '/') - 1;
+                if (level == 0)
+                    total_cpu_time += r.cpu_time;
+            }
+
+            ImGui::Text("|---------Name---------| CPU Time (ms) | GPU Time (ms) | Percentage (%%) |");
+            std::stringstream ss;
+            ss << std::setprecision(3);
             for (auto& r : profiler.recorder)
             {
                 string name = r.name.substr(r.name.find_last_of("/") + 1);
                 int level = std::count(r.name.begin(), r.name.end(), '/') - 1;
                 string indent = "";
                 for (int i = 0; i < level; i++) indent += "  ";
+                string padding = "";
+                for (int i = 0; i < 20 - name.size() - level * 2; i++) padding += " ";
 
-                ImGui::Text("%s%s: %d times, cpu time: %.2f ms, gpu time: %.2f ms",
-                    indent.c_str(), name.c_str(), r.count, r.cpu_time, r.gpu_time);
+                ss << "| " << indent << name << padding << " | ";
+                ss << std::setw(13) << r.cpu_time << " | ";
+                ss << std::setw(13) << r.gpu_time << " | ";
+                ss << std::setw(14) << r.cpu_time / total_cpu_time * 100 << " |" << endl;
+                string str = ss.str();
+                ImGui::TextUnformatted(str.c_str());
+                ss.str("");
             }
             ImGui::TreePop();
         }
+        for (auto& r : profiler.recorder)
+            r.clear_time();
     }
 };
 

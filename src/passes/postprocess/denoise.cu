@@ -98,6 +98,7 @@ void Denoise::render(shared_ptr<Film> film)
     ));
 
     checkCudaErrors(cudaMemcpy(film->get_pixels(), denoised.data(), width * height * sizeof(float4), cudaMemcpyDeviceToDevice));
+    checkCudaErrors(cudaDeviceSynchronize());
 }
 
 void Denoise::render_ui()

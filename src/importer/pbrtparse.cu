@@ -283,7 +283,11 @@ shared_ptr<Material> PBRTParser::load_material(const string& name, const string&
             ior = std::stof(it->second);
     }
     else if (type == "diffusetransmission")
+    {
         bxdf_type = BxDF::Type::DiffuseTransmission;
+        if (dot(base_color, base_color) == 0.0f)
+            base_color = make_float3(1.0f);
+    }
     else
     {
         cout << "ERROR::Unsupported material type: " << type << endl;

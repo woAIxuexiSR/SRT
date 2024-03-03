@@ -395,8 +395,7 @@ void OptixRayTracer::build_sbt()
                 HitgroupSBTRecord hitgroup_record;
                 OPTIX_CHECK(optixSbtRecordPackHeader(module_pgs[i].hitgroupPGs[j], &hitgroup_record));
 
-                hitgroup_record.data.mesh = gscene.mesh_buffer.data() + scene->instances[k];
-                hitgroup_record.data.transform = gscene.instance_transform_buffer.data() + k;
+                hitgroup_record.data.instance = gscene.instance_buffer.data() + k;
                 hitgroup_record.data.light_id = gscene.instance_light_id[k];
 
                 hitgroup_records.push_back(hitgroup_record);

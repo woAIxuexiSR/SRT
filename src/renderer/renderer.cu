@@ -17,6 +17,13 @@ void Renderer::load_passes(const json& config)
     }
 }
 
+void traverse_nodes(shared_ptr<SceneGraphNode> node, unordered_map<string, shared_ptr<SceneGraphNode>>& scene_graph_nodes)
+{
+    scene_graph_nodes[node->name] = node;
+    for (auto child : node->children)
+        traverse_nodes(child, scene_graph_nodes);
+}
+
 Camera::Type string_to_camera_type(const string& str)
 {
     if (str == "perspective")
@@ -60,8 +67,61 @@ void Renderer::load_scene(const json& config)
     if (width == 0 || height == 0)
         resize(1920, 1080);         // default resolution
 
-    // load camera
+    // load animation
     auto vec_to_f3 = [](const vector<float>& v) -> float3 { return { v[0], v[1], v[2] }; };
+    auto vec_to_f4 = [](const vector<float>& v) -> float4 { return { v[0], v[1], v[2], v[3] }; };
+    if (config.find("animation") != config.end())
+    {
+        json anim_config = config.at("animation");
+        if (scene->root == nullptr)
+        {
+            scene->root = make_shared<SceneGraphNode>();
+            scene->root->name = "root";
+            scene->root->transform = Transform();
+        }
+
+        unordered_map<string, shared_ptr<SceneGraphNode>> scene_graph_nodes;
+        traverse_nodes(scene->root, scene_graph_nodes);
+
+        for (auto& c : anim_config)
+        {
+            string name = c.at("name");
+            auto it = scene_graph_nodes.find(name);
+            shared_ptr<SceneGraphNode> node;
+            if (it == scene_graph_nodes.end())
+            {
+                node = make_shared<SceneGraphNode>();
+                node->name = name;
+                node->instance_ids.push_back(scene->find_instance(name));
+                scene->root->children.push_back(node);
+            }
+            else node = it->second;
+
+            if (node->animation_id != -1)
+            {
+                cout << "ERROR::Node " << name << " already has an animation" << endl;
+                exit(-1);
+            }
+
+            shared_ptr<Animation> animation = make_shared<Animation>();
+            animation->name = name;
+            vector<float> time_stamps = c.at("keys");
+            for (int i = 0; i < time_stamps.size(); i++)
+            {
+                if (c.find("translations") != c.end())
+                    animation->translations.push_back({ time_stamps[i], vec_to_f3(c.at("translations")[i]) });
+                if (c.find("rotations") != c.end())
+                    animation->rotations.push_back({ time_stamps[i], vec_to_f4(c.at("rotations")[i]) });
+                if (c.find("scales") != c.end())
+                    animation->scales.push_back({ time_stamps[i], vec_to_f3(c.at("scales")[i]) });
+            }
+            animation->duration = time_stamps.back();
+            int id = scene->add_animation(animation);
+            node->animation_id = id;
+        }
+    }
+
+    // load camera
     if (config.find("camera") != config.end())
     {
         json camera_config = config.at("camera");
@@ -107,6 +167,7 @@ void Renderer::load_scene(const json& config)
         }
     }
 
+    scene->compute_mesh_area();
     scene->compute_aabb();
     scene->build_gscene();
     film = make_shared<Film>(width, height);
@@ -115,13 +176,13 @@ void Renderer::load_scene(const json& config)
 void ImageRenderer::run()
 {
     {
-        PROFILE("render");
+        PROFILE("Render");
         for (auto pass : passes)
             pass->render(film);
     }
 
     {
-        PROFILE("save");
+        PROFILE("Save");
         Image image(width, height, film->get_pixels());
         image.save_to_file((config_path.parent_path() / filename).string());
     }

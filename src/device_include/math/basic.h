@@ -23,6 +23,20 @@ __host__ __device__ inline float Degrees(float rad)
     return rad * 180.0f * (float)M_1_PI;
 }
 
+__host__ __device__ inline int binary_search(const float* cdf, int num, float x)
+{
+    int lf = 0, rg = num - 1;
+    while(lf <= rg)
+    {
+        int mid = (lf + rg) / 2;
+        if(cdf[mid] <= x)
+            lf = mid + 1;
+        else
+            rg = mid - 1;
+    }
+    return min(rg + 1, num - 1);
+}
+
 // normalized vector to spherical uv coordinate,  [-pi, pi] x [0, pi]
 __host__ __device__ inline float2 cartesian_to_spherical_uv(float3 p)
 {

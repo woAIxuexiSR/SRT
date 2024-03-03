@@ -127,7 +127,7 @@ GUI::GUI(int _w, int _h, shared_ptr<Camera> _c, int n)
     glViewport(0, 0, _w, _h);
     glfwSetWindowUserPointer(window, &user_data);
     auto framebuffer_size_callback = [](GLFWwindow* window, int w, int h) {
-        glViewport(0, 0, w, h);
+        // glViewport(0, 0, w, h);
         };
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 

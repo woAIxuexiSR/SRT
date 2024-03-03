@@ -35,6 +35,7 @@ public:
     vector<GPUMemory<float3> > normal_buffer;
     vector<GPUMemory<float3> > tangent_buffer;
     vector<GPUMemory<float2> > texcoord_buffer;
+    vector<GPUMemory<float> > area_cdf_buffer;
 
     // used for bone animation
     vector<GPUMemory<float3> > original_vertex_buffer;
@@ -49,13 +50,15 @@ public:
     vector<cudaTextureObject_t> texture_objects;
     GPUMemory<GMaterial> material_buffer;
     GPUMemory<GTriangleMesh> mesh_buffer;
+
     GPUMemory<Transform> instance_transform_buffer;
+    GPUMemory<GInstance> instance_buffer;
 
     // light data
     GPUMemory<Light> light_buffer;
-    GPUMemory<AreaLight> area_light_buffer;
+    GPUMemory<GInstance> area_light_buffer;
+    GPUMemory<float> weigth_cdf_buffer;
     vector<int> instance_light_id;
-    vector<GPUMemory<float> > light_area_buffer;
     GPUMemory<EnvironmentLight> environment_light_buffer;
 };
 
@@ -96,9 +99,10 @@ public:
     int add_texture(shared_ptr<Texture> texture);
     int find_texture(const string& name);
     int add_animation(shared_ptr<Animation> animation);
-    int find_bone(const string& name);
     int add_bone(const Bone& bone);
+    int find_bone(const string& name);
     void add_instance(const Transform& transform, shared_ptr<TriangleMesh> mesh);
+    int find_instance(const string& name);
 
     void set_camera(shared_ptr<Camera> _c) { camera = _c; }
     void set_background(float3 _b) { background = _b; }
@@ -111,10 +115,10 @@ public:
     void build_gscene_materials();
     void build_gscene_meshes();
     void build_gscene_instances();
-    void build_gscene_lights();
 
     /* useful functions */
 
+    void compute_mesh_area();
     void compute_aabb();
 
     void update(float t);

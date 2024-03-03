@@ -45,20 +45,20 @@ int Scene::add_animation(shared_ptr<Animation> animation)
     return id;
 }
 
-int Scene::find_bone(const string& name)
-{
-    for (int i = 0; i < bones.size(); i++)
-        if (bones[i].name == name)
-            return i;
-    return -1;
-}
-
 int Scene::add_bone(const Bone& bone)
 {
     int id = bones.size();
     bones.push_back(bone);
     bone_transforms.push_back(Transform());
     return id;
+}
+
+int Scene::find_bone(const string& name)
+{
+    for (int i = 0; i < bones.size(); i++)
+        if (bones[i].name == name)
+            return i;
+    return -1;
 }
 
 void Scene::add_instance(const Transform& transform, shared_ptr<TriangleMesh> mesh)
@@ -71,6 +71,14 @@ void Scene::add_instance(const Transform& transform, shared_ptr<TriangleMesh> me
     instance_transforms.push_back(transform);
 }
 
+int Scene::find_instance(const string& name)
+{
+    for (int i = 0; i < instances.size(); i++)
+        if (meshes[instances[i]]->name == name)
+            return i;
+    return -1;
+}
+
 /* GPU build functions */
 
 void Scene::build_gscene()
@@ -79,7 +87,6 @@ void Scene::build_gscene()
     build_gscene_materials();
     build_gscene_meshes();
     build_gscene_instances();
-    build_gscene_lights();
 }
 
 void Scene::build_gscene_textures()
@@ -159,6 +166,7 @@ void Scene::build_gscene_meshes()
     gscene.normal_buffer.resize(mesh_num);
     gscene.tangent_buffer.resize(mesh_num);
     gscene.texcoord_buffer.resize(mesh_num);
+    gscene.area_cdf_buffer.resize(mesh_num);
 
     gscene.original_vertex_buffer.resize(mesh_num);
     gscene.original_normal_buffer.resize(mesh_num);
@@ -180,6 +188,7 @@ void Scene::build_gscene_meshes()
             gscene.tangent_buffer[i].resize_and_copy_from_host(mesh->tangents);
         if (!meshes[i]->texcoords.empty())
             gscene.texcoord_buffer[i].resize_and_copy_from_host(mesh->texcoords);
+        gscene.area_cdf_buffer[i].resize_and_copy_from_host(mesh->area_cdf);
 
         if (mesh->has_bone)
         {
@@ -196,11 +205,17 @@ void Scene::build_gscene_meshes()
     vector<GTriangleMesh> gmeshes(mesh_num);
     for (int i = 0; i < mesh_num; i++)
     {
+        gmeshes[i].vert_num = (int)meshes[i]->vertices.size();
+        gmeshes[i].face_num = (int)meshes[i]->indices.size();
+
         gmeshes[i].vertices = gscene.vertex_buffer[i].data();
         gmeshes[i].indices = gscene.index_buffer[i].data();
         gmeshes[i].normals = gscene.normal_buffer[i].data();
         gmeshes[i].tangents = gscene.tangent_buffer[i].data();
         gmeshes[i].texcoords = gscene.texcoord_buffer[i].data();
+
+        gmeshes[i].area = meshes[i]->area;
+        gmeshes[i].area_cdf = gscene.area_cdf_buffer[i].data();
 
         gmeshes[i].material = gscene.material_buffer.data() + meshes[i]->material_id;
     }
@@ -209,55 +224,46 @@ void Scene::build_gscene_meshes()
 
 void Scene::build_gscene_instances()
 {
-    gscene.instance_transform_buffer.resize_and_copy_from_host(instance_transforms);
-}
+    // build instance
 
-void Scene::build_gscene_lights()
-{
+    gscene.instance_transform_buffer.resize_and_copy_from_host(instance_transforms);
+
+    int instance_num = (int)instances.size();
+    vector<GInstance> ginstances(instance_num);
+    for (int i = 0; i < instance_num; i++)
+    {
+        ginstances[i].mesh = gscene.mesh_buffer.data() + instances[i];
+        ginstances[i].transform = gscene.instance_transform_buffer.data() + i;
+    }
+    gscene.instance_buffer.resize_and_copy_from_host(ginstances);
+
+    // build light
+
     gscene.instance_light_id.resize(instances.size(), -1);
 
     int light_num = 0;
+    vector<GInstance> area_lights;
+    float weight_sum = 0.0f;
+    vector<float> weight_cdf;
     for (int i = 0; i < (int)instances.size(); i++)
     {
         auto material = materials[meshes[instances[i]]->material_id];
         if (material->intensity <= 0.0f) continue;
 
         gscene.instance_light_id[i] = light_num;
+        area_lights.push_back(ginstances[i]);
         light_num++;
+
+
+        float weight = material->intensity * meshes[instances[i]]->area;
+        weight_sum += weight;
+        weight_cdf.push_back(weight_sum);
     }
+    for (int i = 0; i < light_num; i++)
+        weight_cdf[i] /= weight_sum;
 
-    gscene.light_area_buffer.resize(light_num);
-    vector<AreaLight> area_lights(light_num);
-    float weight_sum = 0.0f;
-    for (int i = 0; i < (int)instances.size(); i++)
-    {
-        if (gscene.instance_light_id[i] == -1) continue;
-
-        int light_id = gscene.instance_light_id[i];
-        auto mesh = meshes[instances[i]];
-        auto material = materials[meshes[instances[i]]->material_id];
-
-        int face_num = (int)mesh->indices.size();
-        float area = 0.0f;
-        vector<float> areas(face_num);
-        for (int j = 0; j < face_num; j++)
-        {
-            auto& index = mesh->indices[j];
-            auto v0 = mesh->vertices[index.x], v1 = mesh->vertices[index.y], v2 = mesh->vertices[index.z];
-            areas[j] = length(cross(v1 - v0, v2 - v0)) * 0.5f;
-            area += areas[j];
-        }
-        weight_sum += area * material->intensity;
-        gscene.light_area_buffer[light_id].resize_and_copy_from_host(areas);
-
-        area_lights[light_id].mesh = gscene.mesh_buffer.data() + instances[i];
-        area_lights[light_id].transform = gscene.instance_transform_buffer.data() + i;
-
-        area_lights[light_id].face_num = face_num;
-        area_lights[light_id].areas = gscene.light_area_buffer[light_id].data();
-        area_lights[light_id].area_sum = area;
-    }
     gscene.area_light_buffer.resize_and_copy_from_host(area_lights);
+    gscene.weigth_cdf_buffer.resize_and_copy_from_host(weight_cdf);
 
     EnvironmentLight env_light;
     if (environment_map_id == -1)
@@ -276,12 +282,19 @@ void Scene::build_gscene_lights()
     light.num = light_num;
     light.lights = gscene.area_light_buffer.data();
     light.weight_sum = weight_sum;
+    light.weight_cdf = gscene.weigth_cdf_buffer.data();
     light.env_light = gscene.environment_light_buffer.data();
     gscene.light_buffer.resize_and_copy_from_host(&light, 1);
 }
 
 
 /* useful functions */
+
+void Scene::compute_mesh_area()
+{
+    for (int i = 0; i < meshes.size(); i++)
+        meshes[i]->compute_area();
+}
 
 void Scene::compute_aabb()
 {

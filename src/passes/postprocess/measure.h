@@ -65,8 +65,6 @@ public:
 
     friend void from_json(const json& j, Measure& p)
     {
-        if (j.is_null()) return;
-
         if (j.find("ref_path") == j.end())
         {
             cout << "ERROR::Measure: no ref_path specified" << endl;

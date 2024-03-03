@@ -58,10 +58,14 @@ public:
     __host__ __device__ AABB apply_aabb(AABB box) const
     {
         AABB res;
-        float3 pmin = apply_point(box.pmin);
-        float3 pmax = apply_point(box.pmax);
-        res.pmin = make_float3(min(pmin.x, pmax.x), min(pmin.y, pmax.y), min(pmin.z, pmax.z));
-        res.pmax = make_float3(max(pmin.x, pmax.x), max(pmin.y, pmax.y), max(pmin.z, pmax.z));
+        res.expand(apply_point(box.pmin));
+        res.expand(apply_point(make_float3(box.pmin.x, box.pmin.y, box.pmax.z)));
+        res.expand(apply_point(make_float3(box.pmin.x, box.pmax.y, box.pmin.z)));
+        res.expand(apply_point(make_float3(box.pmin.x, box.pmax.y, box.pmax.z)));
+        res.expand(apply_point(make_float3(box.pmax.x, box.pmin.y, box.pmin.z)));
+        res.expand(apply_point(make_float3(box.pmax.x, box.pmin.y, box.pmax.z)));
+        res.expand(apply_point(make_float3(box.pmax.x, box.pmax.y, box.pmin.z)));
+        res.expand(apply_point(box.pmax));
         return res;
     }
 

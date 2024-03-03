@@ -29,12 +29,11 @@ extern "C" __global__ void __closesthit__radiance()
     const float2 uv = optixGetTriangleBarycentrics();
     const float3 ray_dir = optixGetWorldRayDirection();
 
-    const GTriangleMesh* mesh = sbtData.mesh;
-    const Transform* transform = sbtData.transform;
+    const GInstance* instance = sbtData.instance;
     const int light_id = sbtData.light_id;
 
     HitInfo& prd = *(HitInfo*)getPRD<HitInfo>();
-    get_hitinfo(prd, mesh, transform, prim_idx, uv, ray_dir, light_id);
+    get_hitinfo(prd, instance, prim_idx, uv, ray_dir, light_id);
 }
 
 extern "C" __global__ void __closesthit__shadow()

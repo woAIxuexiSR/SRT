@@ -1,5 +1,22 @@
 #include "mesh.h"
 
+void TriangleMesh::compute_area()
+{
+    area_cdf.resize(indices.size());
+    for (int i = 0; i < indices.size(); i++)
+    {
+        float3 v0 = vertices[indices[i].x];
+        float3 v1 = vertices[indices[i].y];
+        float3 v2 = vertices[indices[i].z];
+
+        float A = 0.5f * length(cross(v1 - v0, v2 - v0));
+        area += A;
+        area_cdf[i] = area;
+    }
+    for (int i = 0; i < area_cdf.size(); i++)
+        area_cdf[i] /= area;
+}
+
 void TriangleMesh::compute_aabb()
 {
     assert(!vertices.empty());

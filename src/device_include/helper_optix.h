@@ -47,8 +47,7 @@ struct RaygenData {};
 struct MissData {};
 struct HitgroupData
 {
-    GTriangleMesh* mesh;
-    Transform* transform;
+    GInstance* instance;
     int light_id;
 };
 

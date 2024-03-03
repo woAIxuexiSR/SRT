@@ -77,8 +77,11 @@ void Measure::render_ui()
 
             vector<float> error_vec(error_history.begin(), error_history.end());
             std::for_each(error_vec.begin(), error_vec.end(), [](float& x) { x = log10f(x); });
-            if (ImPlot::BeginPlot("##Measure", "Frame", "log(Error)", ImVec2(-1, 0)))
+            
+            if (ImPlot::BeginPlot("##Measure", ImVec2(-1, 0)))
             {
+                ImPlot::SetupAxis(ImAxis_X1, "Frame", 0);
+                ImPlot::SetupAxis(ImAxis_Y1, "log(Error)", 0);
                 ImPlot::SetupAxisLimits(ImAxis_X1, 0, max_history_size);
                 ImPlot::SetupAxisLimits(ImAxis_Y1, -2.5, 0.5);
                 ImPlot::PlotLine("", error_vec.data(), error_vec.size());
