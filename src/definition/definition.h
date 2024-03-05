@@ -22,9 +22,17 @@ using json = nlohmann::json;
 #include <assimp/postprocess.h>
 
 #include "tiny-cuda-nn/common.h"
+#include "tiny-cuda-nn/loss.h"
+#include "tiny-cuda-nn/optimizer.h"
+#include "tiny-cuda-nn/encoding.h"
+#include "tiny-cuda-nn/network.h"
+#include "tiny-cuda-nn/network_with_input_encoding.h"
 #include "tiny-cuda-nn/gpu_memory.h"
 #include "tiny-cuda-nn/gpu_matrix.h"
 using tcnn::GPUMemory, tcnn::GPUMatrix;
+using tcnn::Loss, tcnn::Optimizer, tcnn::Encoding;
+using tcnn::Network, tcnn::NetworkWithInputEncoding;
+using precision_t = tcnn::network_precision_t;
 
 #include <chrono>
 #include <vector>

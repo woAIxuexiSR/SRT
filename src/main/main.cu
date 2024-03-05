@@ -40,6 +40,7 @@ shared_ptr<Renderer> create_renderer(const string& path, const json& config)
     return renderer;
 }
 
+
 int main(int argc, char* argv[])
 {
     std::filesystem::path path(__FILE__);

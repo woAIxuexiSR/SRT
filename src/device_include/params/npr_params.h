@@ -24,3 +24,33 @@ public:
     float min_depth{ 0.0f };
     float max_depth{ 1000.0f };
 };
+
+
+class NRLHSParams
+{
+public:
+    int seed;
+    int width, height;
+    OptixTraversableHandle traversable;
+
+    Camera camera;
+    float* inference_buffer;
+    bool* mask;
+    float3* base;
+};
+
+class NRRHSParams
+{
+public:
+    int seed;
+    int width, height;
+    OptixTraversableHandle traversable;
+
+    Camera camera;
+    Light* light;
+
+    float* inference_buffer;
+    bool* mask;
+    float3* weight;
+    float3* base;
+};

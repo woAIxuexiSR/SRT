@@ -13,7 +13,7 @@ void Simple::init()
 void Simple::render(shared_ptr<Film> film)
 {
     PROFILE("Simple");
-    SimpleParams host_params;
+    static SimpleParams host_params;
     host_params.seed = random_int(0, INT32_MAX);
     host_params.width = width;
     host_params.height = height;
